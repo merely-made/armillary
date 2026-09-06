@@ -325,7 +325,7 @@ mod tests {
                         match field.name() {
                             "message" => self.message = format!("{value:?}"),
                             "actor" if self.actor.is_empty() => self.actor = format!("{value:?}"),
-                            _ => {}
+                            _ => {},
                         }
                     }
                 }
