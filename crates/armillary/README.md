@@ -43,7 +43,7 @@ command that caused them without defining the outcome vocabulary.
 
 ## Next
 
-- `design_docs/2026-07-07_armillary_founding_proposal.md`
+- `design_docs/armillary_docs/research/2026-07-07_armillary_founding_proposal.md`
 - Consumers in this workspace: `crates/system/fetch`, `crates/fleece` (`crawl` feature),
   pictograph's `canvas` feature (`crates/canvas/pictograph`), and
   `crates/intel/esp` under its `actor` feature.
