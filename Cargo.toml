@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/armillary",
+]
+
+[workspace.package]
+rust-version = "1.97.1"
+version = "0.0.1"
+edition = "2024"
+license = "MPL-2.0"
+repository = "https://github.com/merely-made/armillary"
+authors = [
+    "Mark AB (markik)",
+]
+
+[workspace.dependencies]
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+
+[patch."https://github.com/merely-made/armillary.git".armillary]
+path = "crates/armillary"

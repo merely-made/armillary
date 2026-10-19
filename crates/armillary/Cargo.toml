@@ -3,15 +3,24 @@ rust-version = "1.97.1"
 name = "armillary"
 version = "0.1.1"
 edition = "2024"
-license.workspace = true
 description = "A host-neutral actor-kernel runtime: a !Send host-kernel boundary, a Send actor harness (thread-per-actor or pooled), generation counters for backpressure, and a growable reusing worker pool. GPUI's kernel/actor discipline made structural."
-repository = "https://github.com/merely-made/mere"
-keywords = ["actor", "concurrency", "threading", "runtime", "gpui"]
-categories = ["concurrency", "rust-patterns"]
+repository = "https://github.com/merely-made/armillary"
+keywords = [
+    "actor",
+    "concurrency",
+    "threading",
+    "runtime",
+    "gpui",
+]
+categories = [
+    "concurrency",
+    "rust-patterns",
+]
+
+[package.license]
+workspace = true
 
 [dependencies]
-# Host-neutral instrumentation facade: the actor harness emits lifecycle
-# spans/events; the host installs the subscriber, so this stays host-neutral.
 tracing = "0.1"
 
 [dev-dependencies]
