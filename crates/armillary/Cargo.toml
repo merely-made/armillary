@@ -20,8 +20,14 @@ categories = [
 [package.license]
 workspace = true
 
+[features]
+default = []
+tokio = ["dep:tokio"]
+
 [dependencies]
+tokio = { version = "1", optional = true, features = ["rt", "sync"] }
 tracing = "0.1"
 
 [dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 tracing-subscriber = "0.3"
