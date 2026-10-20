@@ -108,3 +108,20 @@ async fn interrupted_close_preserves_task_ownership_and_outcome() {
     assert_eq!(report.rejected, 1);
     assert!(tasks.is_empty());
 }
+
+#[tokio::test]
+async fn terminal_close_cannot_erase_an_earlier_panic() {
+    let tasks = ResidentTasks::new();
+    let (ready, started) = tokio::sync::oneshot::channel();
+    tasks.spawn(async {
+        ready.send(()).unwrap();
+        panic!("synthetic terminal failure")
+    });
+    started.await.unwrap();
+    let first = tasks.close_and_join().await;
+    assert_eq!(first.panicked, 1);
+    assert_eq!(tasks.close_and_join().await, first);
+    let (a, b) = tokio::join!(tasks.close_and_join(), tasks.close_and_join());
+    assert_eq!(a, first);
+    assert_eq!(b, first);
+}
