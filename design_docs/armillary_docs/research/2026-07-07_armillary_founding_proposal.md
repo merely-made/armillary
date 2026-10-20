@@ -193,3 +193,15 @@ the same control and dedicated/pooled panic tests pass after the change. Shared
 close tests preserve capture release order and multiple errors. Task tests cover
 nested release, reaped panic reporting, reusable drain and terminal refusal.
 Git-only receiving and Mere integration gates are recorded in the owning plan.
+
+
+Execution/shutdown receiving qualification (2026-10-19): the final implementation
+at `e67c5def1c735be047492a867bcdc8b41fba22b8` preserves Send/Sync actor handles
+and cumulative terminal-close failures. Nineteen unit/integration/doc tests pass.
+The qualified Mere receiving gates cover Distillery actor loss and resident close,
+Graphshell doors, Djinn tasks, Fleece and an independent synchronous Git consumer;
+its browser target compiles. Exact consumer pins and scope limits are in
+`mere/design_docs/mere_docs/implementation_strategy/2026-10-19_family_promotion_plan.md`.
+The ordered-close helper collects returned Result errors; it does not convert
+arbitrary resource-close panics into Result failures. Pool Q112/Q113 and the
+later observation/custody boundaries remain separate gates.

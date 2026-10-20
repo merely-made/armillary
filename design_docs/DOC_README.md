@@ -9,3 +9,5 @@ Canonical migration and current receipts: `mere/design_docs/mere_docs/implementa
 - [2026-07-07_armillary_founding_proposal](armillary_docs/research/2026-07-07_armillary_founding_proposal.md)
 
 Execution and shutdown consolidation (2026-10-19): the [founding continuation](armillary_docs/research/2026-07-07_armillary_founding_proposal.md#executionshutdown-consolidation-2026-10-19) records shared lifecycle modules and explicit actor/task outcomes; host policy and pool-worker retirement remain separate.
+
+Receiving qualification (2026-10-19): the founding continuation links the 19-test supplier gate and qualified Mere native/independent/Wasm consumers, while retaining the pool and later ownership gates.
