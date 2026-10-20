@@ -14,6 +14,7 @@ use tokio::task::{JoinError, JoinSet};
 tokio::task_local! { static CURRENT: ResidentTasks; }
 
 /// Actual joined outcomes, including tasks reaped before shutdown.
+/// Open drains consume a report; terminal closes retain a cumulative report.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TaskReport {
     pub completed: usize,
@@ -31,6 +32,12 @@ impl TaskReport {
     pub fn is_clean(&self) -> bool {
         self.panicked == 0 && self.rejected == 0
     }
+    fn include(&mut self, other: Self) {
+        self.completed = self.completed.saturating_add(other.completed);
+        self.cancelled = self.cancelled.saturating_add(other.cancelled);
+        self.panicked = self.panicked.saturating_add(other.panicked);
+        self.rejected = self.rejected.saturating_add(other.rejected);
+    }
     fn record(&mut self, result: Result<(), JoinError>) {
         let count = match result {
             Ok(()) => &mut self.completed,
@@ -43,6 +50,7 @@ impl TaskReport {
 struct State {
     tasks: JoinSet<()>,
     report: TaskReport,
+    terminal_report: TaskReport,
     closed: bool,
 }
 impl Default for State {
@@ -50,6 +58,7 @@ impl Default for State {
         Self {
             tasks: JoinSet::new(),
             report: TaskReport::default(),
+            terminal_report: TaskReport::default(),
             closed: false,
         }
     }
@@ -105,6 +114,7 @@ impl ResidentTasks {
             .closed
     }
     /// Fence concurrent admission, then cancel and join the admitted tasks.
+    /// Repeated/concurrent terminal closes retain earlier terminal failures.
     pub async fn close_and_join(&self) -> TaskReport {
         self.0
             .state
@@ -113,8 +123,9 @@ impl ResidentTasks {
             .closed = true;
         self.cancel_and_join().await
     }
-    /// Cancel and join current work and collect reaped outcomes. Admission stays open.
-    /// Work submitted after an empty drain belongs to the next drain.
+    /// Cancel and join current work without changing admission.
+    /// Open scopes remain reusable; closed scopes retain their terminal report.
+    /// Work submitted after an open empty drain belongs to the next drain.
     pub async fn cancel_and_join(&self) -> TaskReport {
         let _drain = self.0.drain.lock().await;
         loop {
@@ -134,14 +145,13 @@ impl ResidentTasks {
             })
             .await;
             if !next {
-                return std::mem::take(
-                    &mut self
-                        .0
-                        .state
-                        .lock()
-                        .expect("task scope mutex poisoned")
-                        .report,
-                );
+                let mut state = self.0.state.lock().expect("task scope mutex poisoned");
+                let report = std::mem::take(&mut state.report);
+                if state.closed {
+                    state.terminal_report.include(report);
+                    return state.terminal_report;
+                }
+                return report;
             }
         }
     }

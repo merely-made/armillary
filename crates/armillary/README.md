@@ -57,7 +57,8 @@ License: MPL-2.0 (see LICENSE).
 reported error. The caller owns resource order and shutdown policy.
 
 Feature `tokio` adds `tasks::ResidentTasks`. `cancel_and_join` is a reusable drain;
-`close_and_join` fences new admissions before draining. `TaskReport` distinguishes
+`close_and_join` fences new admissions before draining and retains earlier
+terminal failures across repeated/concurrent closes. `TaskReport` distinguishes
 completed, cancelled, panicked and rejected work, including outcomes reaped before
 the drain. Cancelling the drain future preserves the scope's task ownership.
 Detached work outside a scope remains outside its shutdown guarantee.
