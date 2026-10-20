@@ -34,10 +34,15 @@
 
 pub mod actor;
 pub mod boundary;
+pub mod lifecycle;
 pub mod message;
 pub mod pool;
+#[cfg(feature = "tokio")]
+pub mod tasks;
 
-pub use actor::{ActorHandle, Emitter, Wake, spawn, spawn_named, spawn_named_on, spawn_on};
+pub use actor::{
+    ActorError, ActorHandle, Emitter, Wake, spawn, spawn_named, spawn_named_on, spawn_on,
+};
 pub use boundary::KernelThread;
 pub use message::{
     Correlated, Generations, NavGeneration, RequestId, RequestIds, ViewportGeneration,

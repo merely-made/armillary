@@ -21,6 +21,7 @@
 //! them on its own thread.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::Instant;
@@ -66,7 +67,28 @@ impl<U> Emitter<U> {
 pub struct ActorHandle<C> {
     commands: Sender<C>,
     join: Option<JoinHandle<()>>,
+    completion: Option<Receiver<Result<(), ActorError>>>,
+    finished: Arc<AtomicBool>,
 }
+
+/// Failure to complete an actor cleanly. Panic payloads stay out of diagnostics.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActorError {
+    /// The actor unwound while executing its run loop.
+    Panicked,
+    /// Its completion sender disappeared without reporting an outcome.
+    CompletionLost,
+}
+
+impl std::fmt::Display for ActorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Panicked => "actor panicked",
+            Self::CompletionLost => "actor completion was lost",
+        })
+    }
+}
+impl std::error::Error for ActorError {}
 
 impl<C> ActorHandle<C> {
     /// Send a command to the actor. Returns whether it was delivered; a dead actor
@@ -76,17 +98,27 @@ impl<C> ActorHandle<C> {
         self.commands.send(command).is_ok()
     }
 
-    /// Signal shutdown and wait for the actor thread to finish. Mostly for tests
-    /// and orderly teardown; the kernel usually just drops the handle.
-    pub fn join(mut self) {
-        // Take the join handle out, then drop `self` so its command `Sender` closes
-        // and the actor loop ends, *then* wait. Dropping before joining is what
-        // avoids a deadlock (the loop only ends once the channel closes).
-        let handle = self.join.take();
+    /// Whether the run loop has returned or unwound. This does not request a stop.
+    pub fn is_finished(&self) -> bool {
+        self.finished.load(Ordering::Acquire)
+    }
+
+    /// Close commands and wait for this actor's cleanup, including on a pool.
+    /// Dropping a handle remains nonblocking and does not establish completion.
+    pub fn join(mut self) -> Result<(), ActorError> {
+        let thread = self.join.take();
+        let completion = self
+            .completion
+            .take()
+            .expect("actor owns completion receiver");
         drop(self);
-        if let Some(handle) = handle {
-            let _ = handle.join();
+        let result = completion.recv().unwrap_or(Err(ActorError::CompletionLost));
+        if let Some(thread) = thread {
+            if thread.join().is_err() {
+                return Err(ActorError::Panicked);
+            }
         }
+        result
     }
 }
 
@@ -137,11 +169,20 @@ where
         updates: update_tx,
         wake,
     };
-    let join = thread::spawn(move || run_with_lifecycle_span(name, command_rx, emitter, run));
+    let (completion_tx, completion_rx) = mpsc::channel();
+    let finished = Arc::new(AtomicBool::new(false));
+    let done = Arc::clone(&finished);
+    let join = thread::spawn(move || {
+        let result = run_with_lifecycle_span(name, command_rx, emitter, run);
+        done.store(true, Ordering::Release);
+        let _ = completion_tx.send(result);
+    });
     (
         ActorHandle {
             commands: command_tx,
             join: Some(join),
+            completion: Some(completion_rx),
+            finished,
         },
         update_rx,
     )
@@ -149,27 +190,34 @@ where
 
 /// Run `run` on the actor thread under a lifecycle span. Shared by [`spawn_named`] and
 /// [`spawn_named_on`]; the span's paired enter/exit gives the host the actor's lifetime, and the
-/// bracketing events mark start/finish for the event log. A panic in `run` still exits the span
-/// (the guard drops on unwind), so a crashed actor reports a finish.
+/// bracketing events distinguish normal completion from a panic. The caller receives
+/// the same outcome after the actor's run-loop stack has been dropped.
 fn run_with_lifecycle_span<C, U, F>(
     name: &'static str,
     commands: Receiver<C>,
     emitter: Emitter<U>,
     run: F,
-) where
+) -> Result<(), ActorError>
+where
     F: FnOnce(Receiver<C>, Emitter<U>),
 {
     let span = tracing::info_span!(target: "armillary", "actor", actor = name);
     let _guard = span.enter();
     let start = Instant::now();
     tracing::info!(target: "armillary", actor = name, "actor started");
-    run(commands, emitter);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(commands, emitter)))
+        .map_err(|_| ActorError::Panicked);
+    if result.is_err() {
+        tracing::error!(target: "armillary", actor = name, "actor panicked");
+        return result;
+    }
     tracing::info!(
         target: "armillary",
         actor = name,
         lifetime_ms = start.elapsed().as_millis() as u64,
         "actor finished",
     );
+    result
 }
 
 /// Spawn an actor on a pooled worker thread instead of a fresh one.
@@ -210,13 +258,20 @@ where
         updates: update_tx,
         wake,
     };
+    let (completion_tx, completion_rx) = mpsc::channel();
+    let finished = Arc::new(AtomicBool::new(false));
+    let done = Arc::clone(&finished);
     pool.submit(Box::new(move || {
-        run_with_lifecycle_span(name, command_rx, emitter, run)
+        let result = run_with_lifecycle_span(name, command_rx, emitter, run);
+        done.store(true, Ordering::Release);
+        let _ = completion_tx.send(result);
     }));
     (
         ActorHandle {
             commands: command_tx,
             join: None,
+            completion: Some(completion_rx),
+            finished,
         },
         update_rx,
     )
@@ -262,7 +317,7 @@ mod tests {
 
         assert!(handle.command(2));
         assert!(handle.command(3));
-        handle.join(); // closes the command channel; the loop ends; the thread joins
+        handle.join().unwrap(); // closes the command channel; the loop ends; the thread joins
 
         let got: Vec<u32> = updates.iter().collect();
         assert_eq!(
@@ -325,7 +380,7 @@ mod tests {
                         match field.name() {
                             "message" => self.message = format!("{value:?}"),
                             "actor" if self.actor.is_empty() => self.actor = format!("{value:?}"),
-                            _ => {},
+                            _ => {}
                         }
                     }
                 }
@@ -352,7 +407,8 @@ mod tests {
         drop(command_tx); // close the command channel so `run` returns at once
         run_with_lifecycle_span("test_actor", command_rx, emitter, |commands, _out| {
             while commands.recv().is_ok() {}
-        });
+        })
+        .unwrap();
 
         let events = captured.0.lock().unwrap();
         assert!(

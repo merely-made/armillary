@@ -175,3 +175,21 @@ armillary coupling. The sibling crates vates (generation) and sibylla (embedding
 and retrieval) were founded the same day; this crate is the runtime spine beneath
 vates's streaming actor. The name and the promotion decision are recorded in the
 workspace memory.
+
+
+## Execution/shutdown consolidation, 2026-10-19
+
+Implementation follows the accepted boundary scope at
+`mere/design_docs/mere_docs/implementation_strategy/2026-10-19_family_promotion_plan.md`.
+The existing crate now owns ordered-close mechanics and optional Tokio task
+scopes. Hosts supply policy, order and domain outcomes. Dedicated and pooled
+actor handles expose fallible completion; pooled completion is distinct from
+worker lifetime. Reusable draining and terminal close are separate operations.
+Q112/Q113 pool scheduling/retirement remain explicit; the Mere receiving pass
+must qualify actual domain close behavior and inference-disconnection Q217.
+
+Validation so far: the pooled cleanup control fails against the previous source;
+the same control and dedicated/pooled panic tests pass after the change. Shared
+close tests preserve capture release order and multiple errors. Task tests cover
+nested release, reaped panic reporting, reusable drain and terminal refusal.
+Git-only receiving and Mere integration gates are recorded in the owning plan.
