@@ -20,9 +20,9 @@
 //! runtime, push typed updates over a channel plus a wake, and let the kernel drain
 //! them on its own thread.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
@@ -67,7 +67,7 @@ impl<U> Emitter<U> {
 pub struct ActorHandle<C> {
     commands: Sender<C>,
     join: Option<JoinHandle<()>>,
-    completion: Option<Receiver<Result<(), ActorError>>>,
+    completion: Option<Mutex<Receiver<Result<(), ActorError>>>>,
     finished: Arc<AtomicBool>,
 }
 
@@ -110,7 +110,9 @@ impl<C> ActorHandle<C> {
         let completion = self
             .completion
             .take()
-            .expect("actor owns completion receiver");
+            .expect("actor owns completion receiver")
+            .into_inner()
+            .expect("completion receiver is never locked");
         drop(self);
         let result = completion.recv().unwrap_or(Err(ActorError::CompletionLost));
         if let Some(thread) = thread {
@@ -181,7 +183,7 @@ where
         ActorHandle {
             commands: command_tx,
             join: Some(join),
-            completion: Some(completion_rx),
+            completion: Some(Mutex::new(completion_rx)),
             finished,
         },
         update_rx,
@@ -270,7 +272,7 @@ where
         ActorHandle {
             commands: command_tx,
             join: None,
-            completion: Some(completion_rx),
+            completion: Some(Mutex::new(completion_rx)),
             finished,
         },
         update_rx,
@@ -288,6 +290,8 @@ mod tests {
     const _: fn() = || {
         fn assert_send<T: Send>() {}
         assert_send::<ActorHandle<u32>>();
+        fn assert_sync<T: Sync>() {}
+        assert_sync::<ActorHandle<u32>>();
         assert_send::<Emitter<u32>>();
         assert_send::<Receiver<u32>>();
     };
