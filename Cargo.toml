@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/armillary",
+    "crates/apparatus-core",
 ]
 
 [workspace.package]
