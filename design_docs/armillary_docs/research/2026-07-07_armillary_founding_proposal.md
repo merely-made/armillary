@@ -205,3 +205,25 @@ its browser target compiles. Exact consumer pins and scope limits are in
 The ordered-close helper collects returned Result errors; it does not convert
 arbitrary resource-close panics into Result failures. Pool Q112/Q113 and the
 later observation/custody boundaries remain separate gates.
+
+
+## Pool admission and retirement repair, 2026-10-21
+
+Q112 and Q113 are now repaired in the execution package. Admission compares the
+queued demand with waiting and starting workers under one mutex, so a notified
+worker cannot be promised to multiple long-lived jobs. Public pool ownership is
+separate from worker state. The final public handle wakes all waiters; accepted
+jobs finish and workers then exit, releasing shared pool state.
+
+Drop remains nonblocking. It neither cancels jobs nor joins OS threads, and a
+job retaining a pool clone keeps the pool open. Actor completion remains its
+own observation. `workers()` counts all threads spawned, not current liveness.
+
+Both selected regression controls fail on the old source at the intended
+assertions and pass after repair. The default workspace has 38 passing tests;
+all features have 43, including the unchanged 18 Apparatus tests. All 43 also
+pass on Rust 1.97.1. Formatting and focused pool Clippy pass; broader strict
+Clippy encounters two unchanged actor/task lint findings, recorded with exact
+commands in [the repair receipt](../../../support/receipts/pool-lifetime-20261021.json).
+The synchronous normal dependency tree still excludes Tokio. Consumer intake
+is qualified separately in Mere's existing family-promotion plan.

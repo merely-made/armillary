@@ -1,0 +1,237 @@
+{
+  "kind": "Q112 pool admission and Q113 worker retirement",
+  "base_revision": "75643df1f178757bb7b6386913af1a39353f3069",
+  "before_controls": [
+    {
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "test",
+        "-p",
+        "armillary",
+        "--lib",
+        "pool::tests::queued_jobs_do_not_share_one_idle_reservation",
+        "--",
+        "--exact"
+      ],
+      "exit_code": 101,
+      "log": "before-0.log",
+      "log_sha256": "43f2bf1ad1291a62bc5a33114ef4176ac87f51a3b75ded87e036e9e655b627ae"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "test",
+        "-p",
+        "armillary",
+        "--test",
+        "pool_lifetime",
+        "workers_retire_after_the_last_pool_handle_drops",
+        "--",
+        "--exact"
+      ],
+      "exit_code": 101,
+      "log": "before-1.log",
+      "log_sha256": "8995d18dedaec97d636ade6d5763c621ca1595780ac75c430899de6ac364f58c"
+    }
+  ],
+  "before_source_sha256": "5a9c46bdc0bd8d77b65c4b02ac84c21370e85d98c609ad0bd811c6f8c3e5c199",
+  "instrumented_before_sha256": "e64800a91310b226d40994e14a26904add365e5613e32533fd92aa5415511153",
+  "before_instrumentation": "The unchanged admission body was extracted into submit_locked and a private inner accessor added. The Q112 test holds the queue mutex across two admissions to a real idle worker, then releases it and notifies workers; no counts are fabricated. The Q113 control observes worker thread-local teardown through the public API.",
+  "source_sha256": {
+    "crates/armillary/src/pool.rs": "0699ee691f76b11300f6a6fe2ec68bca2d3af1a102e07ead64b8319bcd752555",
+    "crates/armillary/tests/pool_lifetime.rs": "46c8e64682078f5d395212bd18d178108fae21d46e1a3fcf62274514aa987a5e"
+  },
+  "gates": [
+    {
+      "label": "supplier-default",
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "--config",
+        "build.build-dir=\"/Users/markik/Code/repos/armillary/target/build\"",
+        "test",
+        "--locked",
+        "--workspace",
+        "-j2"
+      ],
+      "exit_code": 0,
+      "seconds": 5.94,
+      "log_sha256": "3672bbe3fbf686da5be96a530ed8a3184a30b9bf065f8b566887b082b6022419",
+      "results": [
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+      ]
+    },
+    {
+      "label": "supplier-all-features",
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "--config",
+        "build.build-dir=\"/Users/markik/Code/repos/armillary/target/build\"",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features",
+        "-j2"
+      ],
+      "exit_code": 0,
+      "seconds": 3.41,
+      "log_sha256": "c7a8c898423d22a5340a5f7d308b89d83637b78a455b9076ace092149858f143",
+      "results": [
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+      ]
+    },
+    {
+      "label": "supplier-msrv",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "--config",
+        "build.build-dir=\"/Users/markik/Code/repos/armillary/target/build\"",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features",
+        "-j2"
+      ],
+      "exit_code": 0,
+      "seconds": 7.66,
+      "log_sha256": "620fd2a20994f4e2ff623954f9f0c169af51d6001f9b4c0a5127058e99bf3dc0",
+      "results": [
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+      ]
+    },
+    {
+      "label": "supplier-clippy",
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "--config",
+        "build.build-dir=\"/Users/markik/Code/repos/armillary/target/build\"",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "-j2",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "seconds": 1.33,
+      "log_sha256": "629f2e022190f5052dc782cb6f438558aa1ea42c0202ac1cdef2ce2fa04523a5",
+      "results": []
+    },
+    {
+      "label": "supplier-focused-clippy",
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "--config",
+        "build.build-dir=\"/Users/markik/Code/repos/armillary/target/build\"",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "-j2",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "clippy::collapsible_if"
+      ],
+      "exit_code": 101,
+      "seconds": 0.36,
+      "log_sha256": "50fd33403908740777eae170bea3962551b1947bf953916da3814bf041ef00c6"
+    },
+    {
+      "label": "supplier-format",
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "--config",
+        "build.build-dir=\"/Users/markik/Code/repos/armillary/target/build\"",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.06,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "supplier-lean-tree",
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "--config",
+        "build.build-dir=\"/Users/markik/Code/repos/armillary/target/build\"",
+        "tree",
+        "--locked",
+        "-p",
+        "armillary",
+        "--no-default-features",
+        "-e",
+        "normal"
+      ],
+      "exit_code": 0,
+      "seconds": 0.04,
+      "log_sha256": "d0f50efec94d1fc4887c506016cb0a4b9dffd40947356769f9ea03eef4017fdd"
+    },
+    {
+      "label": "supplier-pool-clippy",
+      "command": [
+        "cargo",
+        "+1.99.1",
+        "--config",
+        "build.build-dir=\"/Users/markik/Code/repos/armillary/target/build\"",
+        "clippy",
+        "--locked",
+        "-p",
+        "armillary",
+        "--lib",
+        "--test",
+        "pool_lifetime",
+        "--all-features",
+        "-j2",
+        "--",
+        "-D",
+        "warnings",
+        "-A",
+        "clippy::collapsible_if"
+      ],
+      "exit_code": 0,
+      "log_sha256": "d406543f224718b237022a6f718b7b5c4163f285ff7b447252247fd16fb99e75"
+    }
+  ],
+  "limits": [
+    "Drop is nonblocking and does not join OS threads or cancel jobs. Jobs and clones that do not return/drop can retain workers.",
+    "workers() counts threads ever spawned; actor completion remains distinct from worker lifetime.",
+    "No new dependency, mandatory Tokio, host shutdown policy, or native UI qualification.",
+    "Broad strict Clippy is blocked by unchanged actor.rs collapsible_if and tests/tasks.rs async_yields_async. Focused library and pool tests pass strict Clippy allowing only the existing collapsible_if warning."
+  ],
+  "local_evidence_directory": "/Users/markik/Code/testing/armillary-pool-20261021"
+}
