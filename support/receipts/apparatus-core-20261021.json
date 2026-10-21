@@ -1,0 +1,222 @@
+{
+  "donor": {
+    "repository": "merely-made/mere",
+    "revision": "8942e30503f2fa91fdefe879ec5268ee42a5241a",
+    "files": {
+      "Cargo.toml": "e4ccd4a283f6b7a970261e3ea7a6b0c1b77989f1f935ed0b811f3af22b2e8b7d",
+      "README.md": "295be6279244e574cbc6973e4a3b3ab5542f06742b1b984b6b777bbbfe662f59",
+      "src/collector.rs": "d4f3572ad1ba07601c2478438fbf7893da6e619083a2dea4eb9a0de6b4e65693",
+      "src/lib.rs": "0727eff8dccb8f115f538da460c255bbc8f17d3720cc32792a614cf52ad5a47f",
+      "src/observation.rs": "2b2da68af36fac22cce5f93abe5da044d455f12452407a37db0fad7081e37fba",
+      "src/inspection.rs": "2c4ee0ac6100920a64b5c60dd5682af564ead89a19a0f21c878013aecdbb2d4c",
+      "src/collector/tests.rs": "53380a6735377b280205ba848e9bfe21be5e5f1d03da180f559115f0ca4d61d7",
+      "src/observation/tests.rs": "9664498d06bb0f7f8ad1f0ef86d58083c7a65bf52dd855175ffc3ceeb04373e3"
+    }
+  },
+  "split": {
+    "src/observation.rs": "2b2da68af36fac22cce5f93abe5da044d455f12452407a37db0fad7081e37fba",
+    "src/observation/tests.rs": "9664498d06bb0f7f8ad1f0ef86d58083c7a65bf52dd855175ffc3ceeb04373e3",
+    "src/inspection.rs": {
+      "sha256": "1648c7111468796de11c60c52946c6153d0df7fe325073446a4bcbf8e32e7758",
+      "change": "Removed only accessibility projection and its feature-gated test; retained portable implementation and four tests verbatim. Removed the resulting blank line before the closing module brace for rustfmt."
+    }
+  },
+  "core_source_sha256": {
+    "crates/apparatus-core/Cargo.toml": "ba2baa89be8633f9850cfa2131f39976dacde544991d12a861fe692c147d15b2",
+    "crates/apparatus-core/README.md": "f42dcf05d24af33a65cfb7996d6c25cfaf2a02ac3c546fe40b589ed2e613ed3e",
+    "crates/apparatus-core/src/lib.rs": "b4ca1810962cbe1a150414e4e6c39d85ffd13422758bd5022c0865f8b4c56c96",
+    "crates/apparatus-core/src/observation.rs": "2b2da68af36fac22cce5f93abe5da044d455f12452407a37db0fad7081e37fba",
+    "crates/apparatus-core/src/inspection.rs": "1648c7111468796de11c60c52946c6153d0df7fe325073446a4bcbf8e32e7758",
+    "crates/apparatus-core/src/observation/tests.rs": "9664498d06bb0f7f8ad1f0ef86d58083c7a65bf52dd855175ffc3ceeb04373e3"
+  },
+  "checks": {
+    "supplier-before": {
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--all-features",
+        "-j2"
+      ],
+      "cwd": "/Users/markik/Code/worktrees/armillary-apparatus-20261021",
+      "revision": "80fa9b822d29fdbcfe3f737b90cf69546c8e2239",
+      "started": "2026-10-21T04:26:09.016095+00:00",
+      "status_before": "",
+      "process_started": true,
+      "exit_code": 0,
+      "finished": "2026-10-21T04:26:17.442074+00:00",
+      "log_sha256": "77de05169f9dc3edafbd5a5a022caffc2c0bc432927b4bb1ffef007956914e86",
+      "suites": [
+        {
+          "result": "ok",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        }
+      ]
+    },
+    "supplier-final": {
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--all-features",
+        "-j2"
+      ],
+      "cwd": "/Users/markik/Code/worktrees/armillary-apparatus-20261021",
+      "revision": "80fa9b822d29fdbcfe3f737b90cf69546c8e2239",
+      "started": "2026-10-21T04:29:35.122372+00:00",
+      "status_before": " M Cargo.lock\n M Cargo.toml\n M README.md\n?? crates/apparatus-core/\n",
+      "process_started": true,
+      "exit_code": 0,
+      "finished": "2026-10-21T04:29:36.058595+00:00",
+      "log_sha256": "d31c856bbf49c85d0fbd44666f2bf380efd8c2512066710cc2aa50d7c614060d",
+      "suites": [
+        {
+          "result": "ok",
+          "passed": 18,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        }
+      ]
+    },
+    "supplier-lean": {
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "apparatus-core",
+        "--no-default-features",
+        "-j2"
+      ],
+      "cwd": "/Users/markik/Code/worktrees/armillary-apparatus-20261021",
+      "revision": "80fa9b822d29fdbcfe3f737b90cf69546c8e2239",
+      "started": "2026-10-21T04:28:32.845270+00:00",
+      "status_before": " M Cargo.lock\n M Cargo.toml\n M README.md\n?? crates/apparatus-core/\n",
+      "process_started": true,
+      "exit_code": 0,
+      "finished": "2026-10-21T04:28:33.844094+00:00",
+      "log_sha256": "3b9d5acc8d97721869661cc071aafdd5344d81452c9936e255fff28b243a37fc",
+      "suites": [
+        {
+          "result": "ok",
+          "passed": 18,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "result": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        }
+      ]
+    },
+    "supplier-normal-tree": {
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "tree",
+        "--locked",
+        "--offline",
+        "-p",
+        "apparatus-core",
+        "--edges",
+        "normal",
+        "--no-default-features"
+      ],
+      "cwd": "/Users/markik/Code/worktrees/armillary-apparatus-20261021",
+      "revision": "80fa9b822d29fdbcfe3f737b90cf69546c8e2239",
+      "started": "2026-10-21T04:28:32.845269+00:00",
+      "status_before": " M Cargo.lock\n M Cargo.toml\n M README.md\n?? crates/apparatus-core/\n",
+      "process_started": true,
+      "exit_code": 0,
+      "finished": "2026-10-21T04:28:32.886510+00:00",
+      "log_sha256": "a99f402b96f3df4ec0a5c61e457f5e3eb61bda792b0d9f28f66d40071f010175",
+      "suites": []
+    }
+  },
+  "normal_library_contract": "Default apparatus-core has no normal dependencies. Optional serde is the only library dependency; no Armillary, Tokio, Mere, Registry, AccessKit or UxTree dependency.",
+  "remaining_owner": "Mere retains its public facade, collector and accessibility projection. Products retain redaction, policy, persistence and actual outcome authority."
+}
