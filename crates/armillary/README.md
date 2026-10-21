@@ -29,7 +29,7 @@ assert_eq!(updates.iter().collect::<Vec<_>>(), vec![2, 5]);
 | --- | --- |
 | `boundary` | `KernelThread`, a zero-size `!Send` + `!Sync` marker (`PhantomData<Rc<()>>`). Embed it in the host's kernel context and moving that context to another thread becomes a compile error. |
 | `actor` | `spawn`, `spawn_named`, `spawn_on`, `spawn_named_on`; `ActorHandle<C>` (`command`, `is_finished`, fallible `join`), `Emitter<U>` (`emit`, `Clone` without requiring `U: Clone`), `Wake = Arc<dyn Fn() + Send + Sync>`. The `run` closure executes on the actor thread, so `!Send` internals are constructed there and never move across. Each run loop is wrapped in a `tracing` span on target `armillary` with `actor started` / `actor finished` (`lifetime_ms`) events. |
-| `pool` | `Pool` (`new`, `submit`, `workers`), a growable worker pool built on `Mutex` + `Condvar`. A worker runs one job for that job's whole lifetime, then waits for the next instead of exiting, so the OS-thread count tracks peak concurrent actors rather than total spawns. |
+| `pool` | `Pool` (`new`, `submit`, `workers`), a growable worker pool built on `Mutex` + `Condvar`. A worker runs one job for its whole lifetime, then serves another. Queued work reserves waiting/starting capacity; the last pool handle initiates nonblocking retirement after admitted work finishes. |
 | `message` | `Generations` (`nav`, `viewport`, `accepts`), `NavGeneration` and `ViewportGeneration` (`bump`), `RequestId`, `RequestIds::issue`, `Correlated<T>` (`new`, `map`). Stamp outgoing work, drop returning work whose stamp no longer matches. |
 
 `spawn` returns an `ActorHandle<C>` plus a `Receiver<U>` the kernel drains.
@@ -63,5 +63,14 @@ completed, cancelled, panicked and rejected work, including outcomes reaped befo
 the drain. Cancelling the drain future preserves the scope's task ownership.
 Detached work outside a scope remains outside its shutdown guarantee.
 
-The known pool admission/retirement findings Q112 and Q113 remain separate gates;
-actor completion does not establish that all pool workers have exited.
+Pool admission/retirement findings Q112 and Q113 are repaired. Queued jobs reserve
+waiting and starting worker capacity, so two submissions cannot depend on the same
+idle worker. Workers retain shared execution state separately from public pool
+handles; the last handle wakes all waiting workers, and each exits once its
+accepted work finishes. A clone retained by a job keeps the pool open.
+
+Pool drop remains nonblocking and does not cancel or join jobs. Actor completion
+is still observed through `ActorHandle::join`; it does not establish that a
+reusable worker has exited. A job that never returns prevents its own retirement.
+`workers()` counts threads ever spawned, including replacements after raw job
+panics; it is not a live-worker or shutdown-completion signal.
