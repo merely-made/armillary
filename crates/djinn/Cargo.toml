@@ -1,0 +1,49 @@
+[package]
+name = "djinn"
+version = "0.0.3"
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Application door protocol and resident lifetime."
+
+[features]
+default = []
+door = ["dep:serde", "dep:serde_json", "dep:thiserror", "dep:zeroize"]
+door-native = ["door", "dep:tokio", "dep:base64", "dep:rand_core", "dep:personae"]
+door-serve = ["door-native", "dep:armillary", "armillary/tokio", "dep:tracing", "dep:libc", "dep:windows-sys", "dep:blake3"]
+custody = ["door", "dep:base64", "dep:chatelaine", "dep:dramatis", "dep:eidetic", "dep:insigne", "dep:personae", "dep:uuid"]
+custody-client = ["custody", "door-native", "dep:tracing"]
+resident = ["dep:armillary", "armillary/tokio", "dep:tokio"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+thiserror = { version = "1", optional = true }
+zeroize = { version = "1", optional = true }
+armillary = { path = "../armillary", optional = true }
+
+[target.'cfg(all(not(target_arch = "wasm32"), any(unix, windows)))'.dependencies]
+tokio = { version = "1", features = ["io-util", "rt", "rt-multi-thread", "net", "time", "sync", "macros"], optional = true }
+base64 = { version = "0.22", optional = true }
+blake3 = { version = "1", optional = true }
+chatelaine = { version = "0.0.3", git = "https://github.com/merely-made/dramatis.git", branch = "main", optional = true }
+dramatis = { version = "0.0.3", git = "https://github.com/merely-made/dramatis.git", branch = "main", optional = true }
+eidetic = { version = "0.0.2", default-features = false, git = "https://github.com/merely-made/eidetic.git", rev = "01ee97b0b95d679430986dffd54c64ce9b3b5ea3", optional = true }
+insigne = { version = "0.0.2", git = "https://github.com/merely-made/dramatis.git", branch = "main", optional = true }
+personae = { version = "0.3.0", git = "https://github.com/merely-made/dramatis.git", branch = "main", optional = true }
+rand_core = { version = "0.6", features = ["getrandom"], optional = true }
+tracing = { version = "0.1", optional = true }
+uuid = { version = "1", features = ["serde", "v4"], optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Pipes", "Win32_System_Threading"], optional = true }
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["io-util", "macros", "rt", "rt-multi-thread", "time"] }
+uuid = { version = "1", features = ["v4"] }
+
+[lints]
+workspace = true

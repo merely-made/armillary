@@ -15,3 +15,5 @@ Receiving qualification (2026-10-19): the founding continuation links the 19-tes
 Demand admission (2026-10-29): the [founding continuation](armillary_docs/research/2026-07-07_armillary_founding_proposal.md#demand-admission-consolidation-2026-10-29)
 records the shared command gate, last-sender/inbox ownership and its qualification.
 Product resource initialization uses standard `LazyLock`; policy stays with hosts.
+
+- [Djinn ownership extraction](armillary_docs/implementation_strategy/2026-10-30_djinn_ownership.md): independent application door and resident lifetimes, immediate receiver migration and qualification.

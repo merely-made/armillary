@@ -1,0 +1,10 @@
+[package]
+name = "djinn-fixture-native"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+djinn = { path = "../../../../crates/djinn", default-features = false, features = ["door-native"] }

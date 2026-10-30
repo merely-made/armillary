@@ -1,0 +1,1127 @@
+{
+  "base": "35298c555f59a018e5cdd1afc624b4a427555f0f",
+  "source_hashes": {
+    "Cargo.toml": "291197dc58a5b1222004b79b4c8b9f286cd1351401094abbd9a95d9c424eea32",
+    "Cargo.lock": "050e06b5035b34cd7006d7eada12251f7ff2bb285f04eaef78a8f52d165c6698",
+    "crates/djinn/src/lib.rs": "a165d1aa0e5fc9cfd04d2c6a57eeccb8385676b6681f08c5a25c1d890d9454e4",
+    "crates/djinn/src/resident.rs": "26d03a308e505caf64f3f927e78d0304a059fc2767146adb5eac26acdbfc7001",
+    "crates/djinn/src/door/app_admission.rs": "0050391deea83a7c3f4bfd5846f67b3ea5e210719f98b8f8e69ed9b5defbf1a1",
+    "crates/djinn/src/door/route.rs": "529e268918d0f90886af10352fc5a4d106cf552844cecde344a1b0ad99156855",
+    "crates/djinn/src/door/wire.rs": "1bf10a08b3957433821664565238419b9fcd9d8754294771e299df41bdb049de",
+    "crates/djinn/src/door/frame.rs": "6fafd8e0fc0aa9387b2617c736734a0711350432eb77204168d968a640e3ee26",
+    "crates/djinn/src/door/local_endpoint.rs": "b6d21a3ad8c8f71158e8f69b368d114b1cf7fcedede91def184dc941fd5c3aa0",
+    "crates/djinn/src/door/app_client.rs": "36f5084f29a254de9c566f1986223390c3880de894e7d8d7490353028252372f",
+    "crates/djinn/src/door/custody.rs": "74866158d40d691373363fbe1d2bbd53e16dccc889192416f0ee847fa5ee3c2c",
+    "crates/djinn/src/door/custody_client.rs": "9455931e4f03c3761487fede9623a8d1cbb03f3ba89320e7d449a2760b5efdc7",
+    "crates/djinn/src/door/custody_identity.rs": "8994be05bd7fb3bf211e86d6fd87de4c71d06c624d6aa1503dbd99fdfe550022",
+    "crates/djinn/src/door/custody_payload.rs": "b72a2d5891839e26c36d51c5c5edf25738c1a2172716aa92004402250b428424",
+    "crates/djinn/src/door/quarantine.rs": "65f85e8edb11c5ac563f664bfcc4c1ab41191580901b430062d76e03229d62c1",
+    "crates/djinn/src/door/mod.rs": "1f3d1d4220648c17fcfea39910db60da39c87d568f318dfe5e8d4d2906a2e6ec",
+    "crates/djinn/src/door/link.rs": "04c7d4d852d4e7e4a9fa46126b2d250e4e84c05083375d7c7ef544ecfcb9b85e",
+    "crates/djinn/src/door/server.rs": "93e78ec9a58e17c077fde4ec73664fc17d65b0ae6ae654b4ee5b4e7e5fbfae6a",
+    "crates/djinn/Cargo.toml": "37cef2ecd04e6f482f7b139a64f3e1030f34eb975e22b4065c16cae906d80399",
+    "support/fixtures/djinn/portable/Cargo.toml": "c48d6aaa3e6609714b7588d0c24d56bf1fa5342a94e6d147d3c6b44722d487bc",
+    "support/fixtures/djinn/native/Cargo.toml": "7de1d5542e59ea98a8b4c1d6050504c01de84a8a06f364f08d6748da50901c8a",
+    "support/fixtures/djinn/custody-types/Cargo.toml": "2c6440f725d396fda41822fe5c07348864d345dadfd4693d9b05b55c39b733a7",
+    "support/fixtures/djinn/custody/Cargo.toml": "b91dc7e5fbaf9a4df903ff11565e36f9b9f6105d908f94758fecc2ed1c9704b2",
+    "support/fixtures/djinn/resident/Cargo.toml": "bd4dbcb4830aba7e31f8dd704ca1af34f0b131fa222ebde1e0bc65ba004d7357",
+    "support/fixtures/djinn/portable/Cargo.lock": "f9a206f5692ddabaaa35ff0a32fa2aba1fbba4572e2152f2b6097c6f15820c2a",
+    "support/fixtures/djinn/native/Cargo.lock": "d26de8fd862d1359a269b63c0aa53410e65c850607c02cada4c6025ed811e8e2",
+    "support/fixtures/djinn/custody-types/Cargo.lock": "2609f1171d3ea759fc276653a063dab6ccf92c375a52839f8cb72ceda9d1f68b",
+    "support/fixtures/djinn/custody/Cargo.lock": "44834c83edb659d3d48eda9e557806e72efe32df799faefcbc8f7a43070f09df",
+    "support/fixtures/djinn/resident/Cargo.lock": "a4124de9a420cdab1f0a409894ea6eb4c34d0e9a92a88d82d35707f7099c26d9",
+    "support/fixtures/djinn/resident/src/lib.rs": "7a5cef1d07c355a537e099b9063eef2cc6fc2642dddc5ce5450ca71b1f220c14",
+    "support/fixtures/djinn/resident/examples/forbidden.rs": "84d9ef3f4682cf19d8e3279c66b83f528b9868ca8574541cd1e98bfbaa72d124",
+    "support/fixtures/djinn/custody/src/lib.rs": "fd02f7719af839d6a1fa67f19c941602e4e150d0732c952b29b5378636529417",
+    "support/fixtures/djinn/custody-types/src/lib.rs": "438aef1bca3340de80a3f96629eb7798621cb5e6e1367b6c9a27789b243b3500",
+    "support/fixtures/djinn/custody-types/examples/forbidden.rs": "37841860e5df164d08dd03bfcbe5f3a85aca33dd16794df3e1773ba6e72167f2",
+    "support/fixtures/djinn/native/src/lib.rs": "7e3e087907e553d90ce5c2f046b7eb9d9c05cc736b7514e987164926d51ea442",
+    "support/fixtures/djinn/native/examples/forbidden.rs": "545aa71c1e56c906fc238775ecc24f9d55d43134a35dc42c548b5964984a14d6",
+    "support/fixtures/djinn/portable/src/lib.rs": "a78c9f07ae5502c0f7ab418bb874bf560cfbf518ae7174471b92e779c026b888",
+    "support/fixtures/djinn/portable/examples/forbidden.rs": "545aa71c1e56c906fc238775ecc24f9d55d43134a35dc42c548b5964984a14d6",
+    "support/fixtures/djinn/check.sh": "feaf730ec75903af534e2f19d076d61dda333e12877425eb4ae6492cddfe0acd"
+  },
+  "gates": [
+    {
+      "name": "djinn-native-branch-20261030",
+      "cwd": "/home/markik/Code/worktrees/armillary-djinn-ownership-20261030",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "djinn",
+        "--no-default-features",
+        "--features",
+        "door-native"
+      ],
+      "wrapped_command": [
+        "flock",
+        "-w",
+        "600",
+        "/home/markik/Code/testing/machine-heavy.lock",
+        "systemd-run",
+        "--user",
+        "--scope",
+        "--unit=custody-contract-djinn-native-branch-20261030",
+        "--property=MemoryMax=3G",
+        "--property=MemorySwapMax=0",
+        "--property=CPUQuota=150%",
+        "env",
+        "CARGO_TARGET_DIR=/home/markik/Code/target",
+        "CARGO_BUILD_BUILD_DIR=/home/markik/Code/target",
+        "CARGO_BUILD_JOBS=1",
+        "CARGO_INCREMENTAL=0",
+        "CARGO_PROFILE_DEV_DEBUG=0",
+        "CARGO_PROFILE_TEST_DEBUG=0",
+        "RUST_TEST_THREADS=1",
+        "nice",
+        "-n",
+        "10",
+        "/usr/bin/time",
+        "-v",
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "600s",
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "djinn",
+        "--no-default-features",
+        "--features",
+        "door-native"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 210.32,
+      "finished_utc": "2026-10-30T05:59:54.252977+00:00",
+      "log": "djinn-native-branch-20261030.log",
+      "log_sha256": "c5eb413b050deec23f113316411a3fe24a5f8a5c84931ff61ef5dc0e200d99fc"
+    },
+    {
+      "name": "djinn-v003-final-native-20261030",
+      "cwd": "/home/markik/Code/worktrees/armillary-djinn-ownership-20261030",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "djinn",
+        "--no-default-features",
+        "--features",
+        "door-serve,custody-client,resident",
+        "--",
+        "--test-threads=1"
+      ],
+      "wrapped_command": [
+        "flock",
+        "-w",
+        "600",
+        "/home/markik/Code/testing/machine-heavy.lock",
+        "systemd-run",
+        "--user",
+        "--scope",
+        "--unit=custody-contract-djinn-v003-final-native-20261030",
+        "--property=MemoryMax=3G",
+        "--property=MemorySwapMax=0",
+        "--property=CPUQuota=150%",
+        "env",
+        "CARGO_TARGET_DIR=/home/markik/Code/target",
+        "CARGO_BUILD_BUILD_DIR=/home/markik/Code/target",
+        "CARGO_BUILD_JOBS=1",
+        "CARGO_INCREMENTAL=0",
+        "CARGO_PROFILE_DEV_DEBUG=0",
+        "CARGO_PROFILE_TEST_DEBUG=0",
+        "RUST_TEST_THREADS=1",
+        "nice",
+        "-n",
+        "10",
+        "/usr/bin/time",
+        "-v",
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "600s",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "djinn",
+        "--no-default-features",
+        "--features",
+        "door-serve,custody-client,resident",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.49,
+      "finished_utc": "2026-10-30T06:06:46.280945+00:00",
+      "log": "djinn-v003-final-native-20261030.log",
+      "log_sha256": "65e58b9ff45802eda10c0a6750527efe7f96e0b79b7be2bbcc872262dea827d6"
+    },
+    {
+      "name": "djinn-v003-fixtures-20261030",
+      "cwd": "/home/markik/Code/worktrees/armillary-djinn-ownership-20261030",
+      "command": [
+        "env",
+        "DJINN_METADATA_DIR=/home/markik/Code/testing/custody-contract-20261029/djinn-v003-metadata-20261030",
+        "bash",
+        "support/fixtures/djinn/check.sh"
+      ],
+      "wrapped_command": [
+        "flock",
+        "-w",
+        "600",
+        "/home/markik/Code/testing/machine-heavy.lock",
+        "systemd-run",
+        "--user",
+        "--scope",
+        "--unit=custody-contract-djinn-v003-fixtures-20261030",
+        "--property=MemoryMax=3G",
+        "--property=MemorySwapMax=0",
+        "--property=CPUQuota=150%",
+        "env",
+        "CARGO_TARGET_DIR=/home/markik/Code/target",
+        "CARGO_BUILD_BUILD_DIR=/home/markik/Code/target",
+        "CARGO_BUILD_JOBS=1",
+        "CARGO_INCREMENTAL=0",
+        "CARGO_PROFILE_DEV_DEBUG=0",
+        "CARGO_PROFILE_TEST_DEBUG=0",
+        "RUST_TEST_THREADS=1",
+        "nice",
+        "-n",
+        "10",
+        "/usr/bin/time",
+        "-v",
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "600s",
+        "env",
+        "DJINN_METADATA_DIR=/home/markik/Code/testing/custody-contract-20261029/djinn-v003-metadata-20261030",
+        "bash",
+        "support/fixtures/djinn/check.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 11.11,
+      "finished_utc": "2026-10-30T06:06:59.486004+00:00",
+      "log": "djinn-v003-fixtures-20261030.log",
+      "log_sha256": "bbac61f27100509a912fb156509e187cb91ae395fae07214abf7a6df33abe7dd"
+    },
+    {
+      "name": "djinn-armillary-baseline-20261030",
+      "cwd": "/home/markik/Code/worktrees/armillary-djinn-ownership-20261030",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "armillary",
+        "--features",
+        "tokio",
+        "--",
+        "--test-threads=1"
+      ],
+      "wrapped_command": [
+        "flock",
+        "-w",
+        "600",
+        "/home/markik/Code/testing/machine-heavy.lock",
+        "systemd-run",
+        "--user",
+        "--scope",
+        "--unit=custody-contract-djinn-armillary-baseline-20261030",
+        "--property=MemoryMax=3G",
+        "--property=MemorySwapMax=0",
+        "--property=CPUQuota=150%",
+        "env",
+        "CARGO_TARGET_DIR=/home/markik/Code/target",
+        "CARGO_BUILD_BUILD_DIR=/home/markik/Code/target",
+        "CARGO_BUILD_JOBS=1",
+        "CARGO_INCREMENTAL=0",
+        "CARGO_PROFILE_DEV_DEBUG=0",
+        "CARGO_PROFILE_TEST_DEBUG=0",
+        "RUST_TEST_THREADS=1",
+        "nice",
+        "-n",
+        "10",
+        "/usr/bin/time",
+        "-v",
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        "600s",
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "armillary",
+        "--features",
+        "tokio",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.65,
+      "finished_utc": "2026-10-30T06:03:06.674553+00:00",
+      "log": "djinn-armillary-baseline-20261030.log",
+      "log_sha256": "fcbe02c3cc8c40cc65eaa759d9a15cf1c5190b55691e9eff30ed565a00fbe826"
+    }
+  ],
+  "feature_cones": {
+    "portable-cone": {
+      "normal_build_packages": [
+        "djinn",
+        "djinn-fixture-portable",
+        "itoa",
+        "memchr",
+        "proc-macro2",
+        "quote",
+        "serde",
+        "serde_core",
+        "serde_derive",
+        "serde_json",
+        "syn",
+        "thiserror",
+        "thiserror-impl",
+        "unicode-ident",
+        "zeroize",
+        "zmij"
+      ],
+      "forbidden": [],
+      "root_features": [],
+      "djinn_features": [
+        "door"
+      ],
+      "djinn_direct_edges": [
+        {
+          "name": "serde",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "derive",
+            "serde_derive",
+            "std"
+          ]
+        },
+        {
+          "name": "serde_json",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "std"
+          ]
+        },
+        {
+          "name": "thiserror",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "zeroize",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default"
+          ]
+        }
+      ]
+    },
+    "native-cone": {
+      "normal_build_packages": [
+        "aead",
+        "arrayvec",
+        "base64",
+        "blake3",
+        "block-buffer",
+        "bytes",
+        "cc",
+        "cfg-if",
+        "chacha20",
+        "chacha20poly1305",
+        "cipher",
+        "cmov",
+        "constant_time_eq",
+        "cpufeatures",
+        "crypto-common",
+        "ctutils",
+        "curve25519-dalek",
+        "curve25519-dalek-derive",
+        "digest",
+        "djinn",
+        "djinn-fixture-native",
+        "ed25519",
+        "ed25519-dalek",
+        "find-msvc-tools",
+        "getrandom",
+        "hybrid-array",
+        "inout",
+        "insigne",
+        "itoa",
+        "libc",
+        "memchr",
+        "mio",
+        "personae",
+        "pin-project-lite",
+        "poly1305",
+        "proc-macro2",
+        "quote",
+        "rand_core",
+        "rustc_version",
+        "semver",
+        "serde",
+        "serde_core",
+        "serde_derive",
+        "serde_json",
+        "sha2",
+        "shlex",
+        "signature",
+        "socket2",
+        "subtle",
+        "syn",
+        "thiserror",
+        "thiserror-impl",
+        "tokio",
+        "tokio-macros",
+        "typenum",
+        "unicode-ident",
+        "universal-hash",
+        "uuid",
+        "zeroize",
+        "zeroize_derive",
+        "zmij"
+      ],
+      "forbidden": [],
+      "root_features": [],
+      "djinn_features": [
+        "door",
+        "door-native"
+      ],
+      "djinn_direct_edges": [
+        {
+          "name": "base64",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default",
+            "std"
+          ]
+        },
+        {
+          "name": "personae",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "rand_core",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "getrandom"
+          ]
+        },
+        {
+          "name": "serde",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "derive",
+            "serde_derive",
+            "std"
+          ]
+        },
+        {
+          "name": "serde_json",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "std"
+          ]
+        },
+        {
+          "name": "thiserror",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "tokio",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "bytes",
+            "default",
+            "io-util",
+            "libc",
+            "macros",
+            "mio",
+            "net",
+            "rt",
+            "rt-multi-thread",
+            "socket2",
+            "sync",
+            "time",
+            "tokio-macros",
+            "windows-sys"
+          ]
+        },
+        {
+          "name": "zeroize",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default",
+            "zeroize_derive"
+          ]
+        }
+      ]
+    },
+    "custody-types-cone": {
+      "normal_build_packages": [
+        "aead",
+        "arrayvec",
+        "async-trait",
+        "base64",
+        "blake3",
+        "block-buffer",
+        "bytecheck",
+        "bytecheck_derive",
+        "bytes",
+        "cc",
+        "cfg-if",
+        "chacha20",
+        "chacha20poly1305",
+        "chartulary",
+        "chatelaine",
+        "cipher",
+        "cmov",
+        "constant_time_eq",
+        "cpufeatures",
+        "crypto-common",
+        "ctutils",
+        "curve25519-dalek",
+        "curve25519-dalek-derive",
+        "digest",
+        "displaydoc",
+        "djinn",
+        "djinn-fixture-custody-types",
+        "dramatis",
+        "ed25519",
+        "ed25519-dalek",
+        "eidetic",
+        "equivalent",
+        "find-msvc-tools",
+        "fixedbitset",
+        "foldhash",
+        "form_urlencoded",
+        "gaz",
+        "getrandom",
+        "hashbrown",
+        "hybrid-array",
+        "icu_collections",
+        "icu_locale_core",
+        "icu_normalizer",
+        "icu_normalizer_data",
+        "icu_properties",
+        "icu_properties_data",
+        "icu_provider",
+        "idna",
+        "idna_adapter",
+        "indexmap",
+        "inout",
+        "insigne",
+        "itoa",
+        "libc",
+        "litemap",
+        "memchr",
+        "munge",
+        "munge_macro",
+        "muniment",
+        "percent-encoding",
+        "personae",
+        "petgraph",
+        "poly1305",
+        "potential_utf",
+        "proc-macro2",
+        "ptr_meta",
+        "ptr_meta_derive",
+        "quote",
+        "rancor",
+        "rand_core",
+        "rend",
+        "rkyv",
+        "rkyv_derive",
+        "rustc_version",
+        "semver",
+        "serde",
+        "serde_core",
+        "serde_derive",
+        "serde_json",
+        "sha1_smol",
+        "sha2",
+        "shlex",
+        "signature",
+        "simdutf8",
+        "slotmap",
+        "smallvec",
+        "stable_deref_trait",
+        "subtle",
+        "syn",
+        "synstructure",
+        "thiserror",
+        "thiserror-impl",
+        "tinystr",
+        "tinyvec",
+        "typenum",
+        "unicode-ident",
+        "universal-hash",
+        "url",
+        "utf8_iter",
+        "utf_types",
+        "uuid",
+        "version_check",
+        "writeable",
+        "yoke",
+        "yoke-derive",
+        "zerofrom",
+        "zerofrom-derive",
+        "zeroize",
+        "zeroize_derive",
+        "zerotrie",
+        "zerovec",
+        "zerovec-derive",
+        "zmij"
+      ],
+      "forbidden": [],
+      "root_features": [],
+      "djinn_features": [
+        "custody",
+        "door"
+      ],
+      "djinn_direct_edges": [
+        {
+          "name": "base64",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default",
+            "std"
+          ]
+        },
+        {
+          "name": "chatelaine",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "dramatis",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "eidetic",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "insigne",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "digest",
+            "verify"
+          ]
+        },
+        {
+          "name": "personae",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "serde",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default",
+            "derive",
+            "serde_derive",
+            "std"
+          ]
+        },
+        {
+          "name": "serde_json",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "std"
+          ]
+        },
+        {
+          "name": "thiserror",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "uuid",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "js",
+            "rng",
+            "serde",
+            "sha1",
+            "std",
+            "v4",
+            "v5"
+          ]
+        },
+        {
+          "name": "zeroize",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default",
+            "zeroize_derive"
+          ]
+        }
+      ]
+    },
+    "custody-cone": {
+      "normal_build_packages": [
+        "aead",
+        "arrayvec",
+        "async-trait",
+        "base64",
+        "blake3",
+        "block-buffer",
+        "bytecheck",
+        "bytecheck_derive",
+        "bytes",
+        "cc",
+        "cfg-if",
+        "chacha20",
+        "chacha20poly1305",
+        "chartulary",
+        "chatelaine",
+        "cipher",
+        "cmov",
+        "constant_time_eq",
+        "cpufeatures",
+        "crypto-common",
+        "ctutils",
+        "curve25519-dalek",
+        "curve25519-dalek-derive",
+        "digest",
+        "displaydoc",
+        "djinn",
+        "djinn-fixture-custody",
+        "dramatis",
+        "ed25519",
+        "ed25519-dalek",
+        "eidetic",
+        "equivalent",
+        "find-msvc-tools",
+        "fixedbitset",
+        "foldhash",
+        "form_urlencoded",
+        "gaz",
+        "getrandom",
+        "hashbrown",
+        "hybrid-array",
+        "icu_collections",
+        "icu_locale_core",
+        "icu_normalizer",
+        "icu_normalizer_data",
+        "icu_properties",
+        "icu_properties_data",
+        "icu_provider",
+        "idna",
+        "idna_adapter",
+        "indexmap",
+        "inout",
+        "insigne",
+        "itoa",
+        "libc",
+        "litemap",
+        "memchr",
+        "mio",
+        "munge",
+        "munge_macro",
+        "muniment",
+        "once_cell",
+        "percent-encoding",
+        "personae",
+        "petgraph",
+        "pin-project-lite",
+        "poly1305",
+        "potential_utf",
+        "proc-macro2",
+        "ptr_meta",
+        "ptr_meta_derive",
+        "quote",
+        "rancor",
+        "rand_core",
+        "rend",
+        "rkyv",
+        "rkyv_derive",
+        "rustc_version",
+        "semver",
+        "serde",
+        "serde_core",
+        "serde_derive",
+        "serde_json",
+        "sha1_smol",
+        "sha2",
+        "shlex",
+        "signature",
+        "simdutf8",
+        "slotmap",
+        "smallvec",
+        "socket2",
+        "stable_deref_trait",
+        "subtle",
+        "syn",
+        "synstructure",
+        "thiserror",
+        "thiserror-impl",
+        "tinystr",
+        "tinyvec",
+        "tokio",
+        "tokio-macros",
+        "tracing",
+        "tracing-attributes",
+        "tracing-core",
+        "typenum",
+        "unicode-ident",
+        "universal-hash",
+        "url",
+        "utf8_iter",
+        "utf_types",
+        "uuid",
+        "version_check",
+        "writeable",
+        "yoke",
+        "yoke-derive",
+        "zerofrom",
+        "zerofrom-derive",
+        "zeroize",
+        "zeroize_derive",
+        "zerotrie",
+        "zerovec",
+        "zerovec-derive",
+        "zmij"
+      ],
+      "forbidden": [],
+      "root_features": [],
+      "djinn_features": [
+        "custody",
+        "custody-client",
+        "door",
+        "door-native"
+      ],
+      "djinn_direct_edges": [
+        {
+          "name": "base64",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default",
+            "std"
+          ]
+        },
+        {
+          "name": "chatelaine",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "dramatis",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "eidetic",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "insigne",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "digest",
+            "verify"
+          ]
+        },
+        {
+          "name": "personae",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "rand_core",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "getrandom"
+          ]
+        },
+        {
+          "name": "serde",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default",
+            "derive",
+            "serde_derive",
+            "std"
+          ]
+        },
+        {
+          "name": "serde_json",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "std"
+          ]
+        },
+        {
+          "name": "thiserror",
+          "kinds": [
+            "normal"
+          ],
+          "features": []
+        },
+        {
+          "name": "tokio",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "bytes",
+            "default",
+            "io-util",
+            "libc",
+            "macros",
+            "mio",
+            "net",
+            "rt",
+            "rt-multi-thread",
+            "socket2",
+            "sync",
+            "time",
+            "tokio-macros",
+            "windows-sys"
+          ]
+        },
+        {
+          "name": "tracing",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "attributes",
+            "default",
+            "std",
+            "tracing-attributes"
+          ]
+        },
+        {
+          "name": "uuid",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "js",
+            "rng",
+            "serde",
+            "sha1",
+            "std",
+            "v4",
+            "v5"
+          ]
+        },
+        {
+          "name": "zeroize",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "alloc",
+            "default",
+            "zeroize_derive"
+          ]
+        }
+      ]
+    },
+    "resident-cone": {
+      "normal_build_packages": [
+        "armillary",
+        "bytes",
+        "djinn",
+        "djinn-fixture-resident",
+        "libc",
+        "mio",
+        "once_cell",
+        "pin-project-lite",
+        "proc-macro2",
+        "quote",
+        "socket2",
+        "syn",
+        "tokio",
+        "tokio-macros",
+        "tracing",
+        "tracing-attributes",
+        "tracing-core",
+        "unicode-ident"
+      ],
+      "forbidden": [],
+      "root_features": [],
+      "djinn_features": [
+        "resident"
+      ],
+      "djinn_direct_edges": [
+        {
+          "name": "armillary",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "default",
+            "tokio"
+          ]
+        },
+        {
+          "name": "tokio",
+          "kinds": [
+            "normal"
+          ],
+          "features": [
+            "bytes",
+            "default",
+            "io-util",
+            "libc",
+            "macros",
+            "mio",
+            "net",
+            "rt",
+            "rt-multi-thread",
+            "socket2",
+            "sync",
+            "time",
+            "tokio-macros",
+            "windows-sys"
+          ]
+        }
+      ]
+    }
+  },
+  "lock_audit": {
+    "baseline_packages_removed": 0,
+    "added_packages": 136,
+    "existing_changed_entries": [
+      {
+        "package": [
+          "nu-ansi-term",
+          "0.50.3",
+          "registry+https://github.com/rust-lang/crates.io-index"
+        ],
+        "before": [
+          "windows-sys"
+        ],
+        "after": [
+          "windows-sys 0.61.2"
+        ]
+      },
+      {
+        "package": [
+          "tokio",
+          "1.54.0",
+          "registry+https://github.com/rust-lang/crates.io-index"
+        ],
+        "before": [
+          "pin-project-lite",
+          "tokio-macros"
+        ],
+        "after": [
+          "bytes",
+          "libc",
+          "mio",
+          "pin-project-lite",
+          "socket2",
+          "tokio-macros",
+          "windows-sys 0.61.2"
+        ]
+      }
+    ]
+  },
+  "scope": "Independent Djinn application door, native selected clients and resident lifetime. Mere supplies concrete composition. No registry publication implied.",
+  "review": "Independent source review corrected in-flight maintenance cancellation and pre-challenge surface snapshot timing; scoped rereview found no further defect.",
+  "limits": [
+    "Windows executor unqualified",
+    "Portable Wasm contracts do not provide browser IPC",
+    "Owned frame wiping excludes serde scratch allocator copies caller payload and kernel buffers",
+    "Native recipient application labels remain self-declared at same-user boundary",
+    "Receiver integration and published receiving pins recorded by Mere delivery receipt"
+  ]
+}
