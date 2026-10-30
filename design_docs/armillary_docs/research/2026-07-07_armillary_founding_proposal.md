@@ -227,3 +227,31 @@ Clippy encounters two unchanged actor/task lint findings, recorded with exact
 commands in [the repair receipt](../../../support/receipts/pool-lifetime-20261021.json).
 The synchronous normal dependency tree still excludes Tokio. Consumer intake
 is qualified separately in Mere's existing family-promotion plan.
+
+
+## Demand admission consolidation, 2026-10-29
+
+**Status: landed, supplier-qualified.** Turnstone's place and optional protocol adapters need
+one deferred admission rule over this crate's existing actor harness. Product
+commands, configuration keys, refusal updates and authorization remain with
+the host. The runtime owns the once-only actor factory, coalesced passive
+configuration and the update inbox; it does not add a pool or another loop.
+
+The ownership target is demand admission without eager workers. Its validation
+covers first demand, replacement/withdrawal of pending configuration, honest
+absence and command-channel closure when the final sender drops while an inbox
+is still retained. Receiving adoption removes the product's local copy.
+
+Generic resource initialization uses the standard library's `LazyLock` rather
+than another Armillary synchronization type. Initialization of native engines,
+media, device readers and publishing resources remains with their owners.
+
+
+Qualification (2026-10-29): 18 default-feature tests and 18 all-feature tests
+pass. The retained negative control failed when the inbox prolonged command
+ownership. The shared gate now closes the actor after its last sender, permits
+inbox draining, releases unstarted configuration and preserves queued refusals.
+The six demand controls cover concurrent first use, coalescing, withdrawal,
+absence and both started and unstarted close paths. Existing actor and pool
+controls remain green. No product, device or platform presentation is qualified
+by this supplier gate.

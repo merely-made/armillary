@@ -34,6 +34,7 @@
 
 pub mod actor;
 pub mod boundary;
+pub mod demand;
 pub mod lifecycle;
 pub mod message;
 pub mod pool;
