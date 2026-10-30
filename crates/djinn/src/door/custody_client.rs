@@ -30,6 +30,7 @@ use personae::{Ed25519Keypair, Ed25519PublicKey, IdentityError, ProfileId, Retai
 
 use crate::door::app_admission::{AppId, AppRouteId, configured_app_endpoint};
 use crate::door::app_client::{AppClientError, AppConnection};
+use crate::door::declaration::AppDeclaration;
 use crate::door::custody::{
     CUSTODY_ROUTE, CustodyAnswer, CustodyCall, CustodyRefusal, EpochKeyRequest, KeySource,
     ReleasedEpochKey, ResidentStatus, StationGrantRequest,
@@ -86,6 +87,32 @@ impl CustodyClient {
     pub async fn open_at(endpoint: &str, app: AppId) -> Result<Self, CustodyClientError> {
         let route = AppRouteId::new(CUSTODY_ROUTE).expect("the custody route id is valid");
         let inner = AppConnection::open_route_at(endpoint, app, route)
+            .await
+            .map_err(CustodyClientError::Absent)?;
+        Ok(Self {
+            inner,
+            profile: None,
+        })
+    }
+
+    /// Connect to the configured endpoint as `app`, carrying its declaration.
+    /// Djinn then answers only the custody the declaration names and the
+    /// owner grants.
+    pub async fn open_declared(
+        app: AppId,
+        declaration: AppDeclaration,
+    ) -> Result<Self, CustodyClientError> {
+        Self::open_declared_at(&configured_app_endpoint(), app, declaration).await
+    }
+
+    /// The same, at an explicit endpoint.
+    pub async fn open_declared_at(
+        endpoint: &str,
+        app: AppId,
+        declaration: AppDeclaration,
+    ) -> Result<Self, CustodyClientError> {
+        let route = AppRouteId::new(CUSTODY_ROUTE).expect("the custody route id is valid");
+        let inner = AppConnection::open_declared_route_at(endpoint, app, route, declaration)
             .await
             .map_err(CustodyClientError::Absent)?;
         Ok(Self {
@@ -361,6 +388,29 @@ impl BlockingCustodyClient {
             .build()
             .map_err(|error| CustodyClientError::Absent(AppClientError::Io(error)))?;
         let client = runtime.block_on(CustodyClient::open_at(endpoint, app))?;
+        Ok(Self {
+            runtime,
+            client,
+            timeout: None,
+        })
+    }
+
+    /// Connect to the configured endpoint as `app`, carrying its declaration.
+    pub fn open_declared(app: AppId, declaration: AppDeclaration) -> Result<Self, CustodyClientError> {
+        Self::open_declared_at(&configured_app_endpoint(), app, declaration)
+    }
+
+    /// The same, at an explicit endpoint.
+    pub fn open_declared_at(
+        endpoint: &str,
+        app: AppId,
+        declaration: AppDeclaration,
+    ) -> Result<Self, CustodyClientError> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| CustodyClientError::Absent(AppClientError::Io(error)))?;
+        let client = runtime.block_on(CustodyClient::open_declared_at(endpoint, app, declaration))?;
         Ok(Self {
             runtime,
             client,

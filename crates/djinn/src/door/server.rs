@@ -10,6 +10,7 @@
 use std::future::Future;
 use tokio::io::{AsyncRead, AsyncWrite};
 use super::{
+    declaration::AppAuthority,
     app_admission::{AllowedAppRoutes, AppAdmissionError, AppHello, AppId, AppRequest, AppRouteGrants},
     frame::{FrameError, read_native_message_async, write_native_message_async},
     link::{LinkError, LocalLink},
@@ -31,6 +32,9 @@ pub enum AppServerError {
 pub struct AdmittedApp {
     pub app: AppId,
     pub route: ResidentEndpointRoute,
+    /// What the connection declared and its owner granted; `None` for an
+    /// application admitted by label alone.
+    pub authority: Option<AppAuthority>,
 }
 
 /// Snapshot owner grants once for each accepted same-user connection. The
@@ -54,7 +58,8 @@ where
     let hello = read_native_message_async::<_, AppHello>(reader).await?.ok_or(AppServerError::MissingHello)?;
     let request = hello.accept()?;
     let route = resolve(&request, allowed)?;
-    Ok(AdmittedApp { app: request.app, route })
+    let authority = allowed.authority(&request);
+    Ok(AdmittedApp { app: request.app, route, authority })
 }
 
 /// Complete connect after the adapter has captured its per-session surface.

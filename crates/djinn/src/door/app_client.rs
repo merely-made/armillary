@@ -18,6 +18,7 @@
 use rand_core::{OsRng, RngCore};
 
 use crate::door::app_admission::{AppHello, AppId, AppRouteId, configured_app_endpoint};
+use crate::door::declaration::AppDeclaration;
 use crate::door::frame::{
     FrameError, JsonDiagnostic, read_native_message_async, write_native_message_async,
 };
@@ -98,6 +99,27 @@ impl AppConnection {
         route: AppRouteId,
     ) -> Result<Self, AppClientError> {
         Self::open_with_hello(endpoint, AppHello::for_route(app.clone(), route), app).await
+    }
+
+    /// Connect to the configured endpoint, request `route` and carry the
+    /// application's declaration.
+    pub async fn open_declared_route(
+        app: AppId,
+        route: AppRouteId,
+        declaration: AppDeclaration,
+    ) -> Result<Self, AppClientError> {
+        Self::open_declared_route_at(&configured_app_endpoint(), app, route, declaration).await
+    }
+
+    /// Declared route-aware connection at an explicit endpoint.
+    pub async fn open_declared_route_at(
+        endpoint: &str,
+        app: AppId,
+        route: AppRouteId,
+        declaration: AppDeclaration,
+    ) -> Result<Self, AppClientError> {
+        let hello = AppHello::for_route(app.clone(), route).declaring(declaration);
+        Self::open_with_hello(endpoint, hello, app).await
     }
 
     async fn open_with_hello(

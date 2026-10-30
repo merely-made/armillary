@@ -29,6 +29,7 @@ pub mod custody_client;
 pub mod custody_identity;
 #[cfg(all(feature = "custody", any(unix, windows), not(target_arch = "wasm32")))]
 pub mod custody_payload;
+pub mod declaration;
 pub mod frame;
 #[cfg(all(
     feature = "door-native",

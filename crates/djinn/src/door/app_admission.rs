@@ -33,6 +33,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::door::declaration::{AppAuthority, AppDeclaration, AppGrant, DeclarationError};
 use crate::door::route::ResidentEndpointRoute;
 
 /// Environment override for the first-party application endpoint.
@@ -140,6 +141,15 @@ pub enum AppAdmissionError {
     InvalidRoute(String),
     /// A version-one hello attempted to smuggle a route selection.
     RouteOnLegacyHello,
+    /// A version-one hello carried a declaration.
+    DeclarationOnLegacyHello,
+    /// The declaration was malformed.
+    InvalidDeclaration(DeclarationError),
+    /// The owner grants this application by declaration, and its hello
+    /// declared nothing.
+    DeclarationRequired(AppId),
+    /// The application's declaration does not name this route.
+    RouteUndeclared { app: AppId, route: AppRouteId },
 }
 
 impl std::fmt::Display for AppAdmissionError {
@@ -168,6 +178,16 @@ impl std::fmt::Display for AppAdmissionError {
             Self::RouteOnLegacyHello => {
                 f.write_str("the version-one first-party hello cannot select a resident route")
             }
+            Self::DeclarationOnLegacyHello => {
+                f.write_str("the version-one first-party hello cannot carry a declaration")
+            }
+            Self::InvalidDeclaration(error) => write!(f, "the hello's declaration is invalid: {error}"),
+            Self::DeclarationRequired(app) => {
+                write!(f, "{app} is admitted by its declaration, and its hello declared nothing")
+            }
+            Self::RouteUndeclared { app, route } => {
+                write!(f, "{app} did not declare the resident route {route}")
+            }
         }
     }
 }
@@ -185,6 +205,10 @@ pub struct AppHello {
     /// version-one hello, which always means [`APP_IDENTITY_ROUTE`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route: Option<AppRouteId>,
+    /// What the application states it opens, offers and needs. Version two
+    /// only; absent keeps the hello byte-shaped for clients that predate it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declaration: Option<AppDeclaration>,
 }
 
 impl AppHello {
@@ -194,6 +218,7 @@ impl AppHello {
             schema: APP_HELLO_SCHEMA.to_string(),
             app,
             route: None,
+            declaration: None,
         }
     }
 
@@ -203,7 +228,14 @@ impl AppHello {
             schema: APP_ROUTE_HELLO_SCHEMA.to_string(),
             app,
             route: Some(route),
+            declaration: None,
         }
+    }
+
+    /// Carry `declaration` on a route-aware hello.
+    pub fn declaring(mut self, declaration: AppDeclaration) -> Self {
+        self.declaration = Some(declaration);
+        self
     }
 
     /// Check the protocol and yield the application and route requested.
@@ -219,6 +251,9 @@ impl AppHello {
                 if self.route.is_some() {
                     return Err(AppAdmissionError::RouteOnLegacyHello);
                 }
+                if self.declaration.is_some() {
+                    return Err(AppAdmissionError::DeclarationOnLegacyHello);
+                }
                 AppRouteId::identity()
             }
             APP_ROUTE_HELLO_SCHEMA => self
@@ -229,7 +264,16 @@ impl AppHello {
         // Transparent serde can construct the type without calling `new`, so
         // validate the wire value again at admission.
         let route = AppRouteId::new(route.0)?;
-        Ok(AppRequest { app, route })
+        if let Some(declaration) = &self.declaration {
+            declaration
+                .validate()
+                .map_err(AppAdmissionError::InvalidDeclaration)?;
+        }
+        Ok(AppRequest {
+            app,
+            route,
+            declaration: self.declaration,
+        })
     }
 }
 
@@ -238,6 +282,20 @@ impl AppHello {
 pub struct AppRequest {
     pub app: AppId,
     pub route: AppRouteId,
+    /// The application's declaration, when its hello carried one.
+    pub declaration: Option<AppDeclaration>,
+}
+
+impl AppRequest {
+    /// A request without a declaration, as a host rechecking policy or a
+    /// client that predates declarations names one.
+    pub fn new(app: AppId, route: AppRouteId) -> Self {
+        Self {
+            app,
+            route,
+            declaration: None,
+        }
+    }
 }
 
 /// The applications this device serves.
@@ -250,6 +308,10 @@ pub struct AllowedAppRoutes {
     routes: BTreeMap<AppId, BTreeMap<AppRouteId, ResidentEndpointRoute>>,
     defaults: BTreeMap<AppRouteId, ResidentEndpointRoute>,
     denied: BTreeSet<(AppId, AppRouteId)>,
+    /// Owner grants for applications admitted by their declarations.
+    grants: BTreeMap<AppId, AppGrant>,
+    /// Routes the host serves to declared applications whose grant names them.
+    served: BTreeMap<AppRouteId, ResidentEndpointRoute>,
 }
 
 impl Default for AllowedAppRoutes {
@@ -287,31 +349,100 @@ impl AllowedAppRoutes {
             routes: BTreeMap::new(),
             defaults: BTreeMap::new(),
             denied: BTreeSet::new(),
+            grants: BTreeMap::new(),
+            served: BTreeMap::new(),
         }
     }
 
     /// Select the host-configured route granted to this request.
+    ///
+    /// A request carrying a declaration is admitted only to a route it
+    /// declares and the policy permits. An application the owner grants by
+    /// declaration must declare; one without such a grant is admitted by its
+    /// label's route table, as before declarations.
     pub fn admit(&self, request: &AppRequest) -> Result<ResidentEndpointRoute, AppAdmissionError> {
-        let Some(routes) = self.routes.get(&request.app) else {
-            return Err(AppAdmissionError::NotAllowed(request.app.clone()));
-        };
-        if self
-            .denied
-            .contains(&(request.app.clone(), request.route.clone()))
-        {
+        match &request.declaration {
+            Some(declaration) => {
+                if !self.grants.contains_key(&request.app) && !self.routes.contains_key(&request.app) {
+                    return Err(AppAdmissionError::NotAllowed(request.app.clone()));
+                }
+                if !declaration.declares_route(&request.route) {
+                    return Err(AppAdmissionError::RouteUndeclared {
+                        app: request.app.clone(),
+                        route: request.route.clone(),
+                    });
+                }
+            }
+            None if self.grants.contains_key(&request.app) => {
+                return Err(AppAdmissionError::DeclarationRequired(request.app.clone()));
+            }
+            None => {}
+        }
+        self.permits(&request.app, &request.route)
+    }
+
+    /// Whether owner policy, as it stands, lets `app` open `route`: a route
+    /// granted to its label, a default, or a served route its owner grant
+    /// names. Denials win. This does not consult a declaration; a host
+    /// rechecking a session admitted earlier uses it.
+    pub fn permits(
+        &self,
+        app: &AppId,
+        route: &AppRouteId,
+    ) -> Result<ResidentEndpointRoute, AppAdmissionError> {
+        let routes = self.routes.get(app);
+        let grant = self.grants.get(app);
+        if routes.is_none() && grant.is_none() {
+            return Err(AppAdmissionError::NotAllowed(app.clone()));
+        }
+        if self.denied.contains(&(app.clone(), route.clone())) {
             return Err(AppAdmissionError::RouteDenied {
-                app: request.app.clone(),
-                route: request.route.clone(),
+                app: app.clone(),
+                route: route.clone(),
             });
         }
-        routes
-            .get(&request.route)
-            .or_else(|| self.defaults.get(&request.route))
-            .cloned()
-            .ok_or_else(|| AppAdmissionError::RouteNotGranted {
-                app: request.app.clone(),
-                route: request.route.clone(),
-            })
+        let not_granted = || AppAdmissionError::RouteNotGranted {
+            app: app.clone(),
+            route: route.clone(),
+        };
+        if let Some(selected) = routes.and_then(|routes| routes.get(route)) {
+            return Ok(selected.clone());
+        }
+        match grant {
+            Some(grant) if grant.grants_route(route) => self
+                .served
+                .get(route)
+                .or_else(|| self.defaults.get(route))
+                .cloned()
+                .ok_or_else(not_granted),
+            Some(_) => Err(not_granted()),
+            None => self.defaults.get(route).cloned().ok_or_else(not_granted),
+        }
+    }
+
+    /// The authority of an admitted declared request: its declaration and
+    /// its owner grant. `None` for a request admitted by label alone.
+    pub fn authority(&self, request: &AppRequest) -> Option<AppAuthority> {
+        let declaration = request.declaration.clone()?;
+        let grant = self.grants.get(&request.app)?.clone();
+        Some(AppAuthority::new(declaration, grant))
+    }
+
+    /// Admit `grant.app` by its declaration, within this grant, replacing
+    /// any earlier grant for it.
+    pub fn grant_app(&mut self, grant: AppGrant) {
+        self.grants.insert(grant.app.clone(), grant);
+    }
+
+    /// The owner grant for a declared application.
+    pub fn app_grant(&self, app: &AppId) -> Option<&AppGrant> {
+        self.grants.get(app)
+    }
+
+    /// Serve `route` to declared applications whose grant names it.
+    pub fn serve(&mut self, route: ResidentEndpointRoute) {
+        self.served
+            .insert(AppRouteId::new(route.id()).expect("valid route"), route);
     }
 
     /// Make one route available to every application the owner already
@@ -324,7 +455,7 @@ impl AllowedAppRoutes {
     /// Whether the owner has admitted this application independently of
     /// route defaults and recorded denials.
     pub fn is_admitted(&self, app: &AppId) -> bool {
-        self.routes.contains_key(app)
+        self.routes.contains_key(app) || self.grants.contains_key(app)
     }
 
     /// Set or clear an owner denial without altering route grants.
@@ -345,6 +476,20 @@ impl AllowedAppRoutes {
 
     /// The application and route pairs admitted, for reporting.
     pub fn iter(&self) -> impl Iterator<Item = (&AppId, &AppRouteId)> {
+        let declared = self.grants.iter().flat_map(move |(app, grant)| {
+            self.served
+                .keys()
+                .chain(self.defaults.keys().filter(move |route| !self.served.contains_key(*route)))
+                .filter(move |route| grant.grants_route(route))
+                // A label-admitted app's routes and defaults are listed below.
+                .filter(move |route| {
+                    !self.routes.get(app).is_some_and(|routes| {
+                        routes.contains_key(*route) || self.defaults.contains_key(*route)
+                    })
+                })
+                .filter(move |route| !self.denied.contains(&(app.clone(), (*route).clone())))
+                .map(move |route| (app, route))
+        });
         self.routes.iter().flat_map(move |(app, routes)| {
             routes
                 .keys()
@@ -356,6 +501,7 @@ impl AllowedAppRoutes {
                 .filter(move |route| !self.denied.contains(&(app.clone(), (*route).clone())))
                 .map(move |route| (app, route))
         })
+        .chain(declared)
     }
 }
 
@@ -480,6 +626,7 @@ mod tests {
             schema: "mere.graphshell/device-broker-hello/v1".to_string(),
             app: AppId::new("turnstone"),
             route: None,
+            declaration: None,
         };
         let error = wrong.accept().unwrap_err();
         assert!(matches!(error, AppAdmissionError::WrongSchema(_)));
@@ -500,10 +647,7 @@ mod tests {
         let hello = AppHello::new(AppId::new("turnstone"));
         assert_eq!(
             hello.clone().accept().unwrap(),
-            AppRequest {
-                app: AppId::new("turnstone"),
-                route: AppRouteId::identity(),
-            }
+            AppRequest::new(AppId::new("turnstone"), AppRouteId::identity())
         );
         let json = serde_json::to_string(&hello).unwrap();
         assert!(
@@ -519,10 +663,7 @@ mod tests {
         let hello = AppHello::for_route(AppId::new("turnstone"), knot.clone());
         assert_eq!(
             hello.clone().accept().unwrap(),
-            AppRequest {
-                app: AppId::new("turnstone"),
-                route: knot.clone(),
-            }
+            AppRequest::new(AppId::new("turnstone"), knot.clone())
         );
         let grants = AllowedAppRoutes::new([(
             AppId::new("turnstone"),
@@ -539,6 +680,7 @@ mod tests {
             schema: APP_HELLO_SCHEMA.to_string(),
             app: AppId::new("turnstone"),
             route: Some(AppRouteId::new("knot").unwrap()),
+            declaration: None,
         };
         assert_eq!(
             hello.accept().unwrap_err(),
@@ -571,6 +713,113 @@ mod tests {
     #[test]
     fn the_default_endpoint_is_named() {
         assert!(!default_app_endpoint().is_empty());
+    }
+
+    fn knotlike() -> (AppDeclaration, AppGrant) {
+        use crate::door::declaration::NamePattern;
+        let declaration = AppDeclaration {
+            routes: vec![NamePattern::exact("custody"), NamePattern::prefix("mere/")],
+            ..AppDeclaration::default()
+        };
+        let mut grant = AppGrant::new(AppId::new("knotlike"));
+        grant.routes = vec![NamePattern::exact("custody"), NamePattern::prefix("mere/")];
+        (declaration, grant)
+    }
+
+    fn route(id: &str) -> ResidentEndpointRoute {
+        ResidentEndpointRoute::new(id, Duration::from_millis(50)).unwrap()
+    }
+
+    fn declared_request(declaration: &AppDeclaration, route: &str) -> AppRequest {
+        AppHello::for_route(AppId::new("knotlike"), AppRouteId::new(route).unwrap())
+            .declaring(declaration.clone())
+            .accept()
+            .unwrap()
+    }
+
+    #[test]
+    fn a_declared_app_gets_only_what_it_declares_and_its_owner_grants() {
+        let (declaration, grant) = knotlike();
+        let mut allowed = AllowedAppRoutes::none();
+        allowed.grant_app(grant);
+        allowed.serve(route("custody"));
+        allowed.serve(route("published-site-v1"));
+        allowed.grant_default(route("mere/notes"));
+        assert_eq!(allowed.admit(&declared_request(&declaration, "custody")).unwrap().id(), "custody");
+        assert_eq!(allowed.admit(&declared_request(&declaration, "mere/notes")).unwrap().id(), "mere/notes");
+        assert_eq!(
+            allowed.admit(&declared_request(&declaration, "published-site-v1")).unwrap_err(),
+            AppAdmissionError::RouteUndeclared {
+                app: AppId::new("knotlike"),
+                route: AppRouteId::new("published-site-v1").unwrap(),
+            },
+            "served and reachable, but undeclared"
+        );
+        let mut wider = declaration.clone();
+        wider.routes.push(crate::door::declaration::NamePattern::exact("published-site-v1"));
+        assert!(matches!(
+            allowed.admit(&declared_request(&wider, "published-site-v1")),
+            Err(AppAdmissionError::RouteNotGranted { .. })
+        ), "declared, but the owner did not grant it");
+        assert!(matches!(
+            allowed.admit(&declared_request(&declaration, "mere/unserved")),
+            Err(AppAdmissionError::RouteNotGranted { .. })
+        ), "granted by namespace, but not served");
+        allowed.set_denied(AppId::new("knotlike"), AppRouteId::new("mere/notes").unwrap(), true);
+        assert!(matches!(
+            allowed.admit(&declared_request(&declaration, "mere/notes")),
+            Err(AppAdmissionError::RouteDenied { .. })
+        ));
+        let authority = allowed.authority(&declared_request(&declaration, "custody")).unwrap();
+        assert_eq!(authority.app(), &AppId::new("knotlike"));
+        let reported: Vec<_> = allowed.iter().map(|(app, route)| (app.as_str(), route.as_str())).collect();
+        assert_eq!(reported, [("knotlike", "custody")]);
+    }
+
+    #[test]
+    fn a_declared_app_cannot_fall_back_to_its_label() {
+        let (_, grant) = knotlike();
+        let mut allowed = AllowedAppRoutes::none();
+        allowed.grant_app(grant);
+        allowed.serve(route("custody"));
+        let request = AppHello::for_route(AppId::new("knotlike"), AppRouteId::new("custody").unwrap())
+            .accept()
+            .unwrap();
+        assert_eq!(
+            allowed.admit(&request).unwrap_err(),
+            AppAdmissionError::DeclarationRequired(AppId::new("knotlike"))
+        );
+        assert!(allowed.authority(&request).is_none());
+        assert!(
+            allowed.permits(&request.app, &request.route).is_ok(),
+            "a host recheck of an admitted session consults policy, not the hello"
+        );
+    }
+
+    #[test]
+    fn an_unknown_app_gains_nothing_by_declaring() {
+        let (declaration, _) = knotlike();
+        let mut allowed = AllowedAppRoutes::none();
+        allowed.serve(route("custody"));
+        let request = AppHello::for_route(AppId::new("knotlike"), AppRouteId::new("custody").unwrap())
+            .declaring(declaration)
+            .accept()
+            .unwrap();
+        assert_eq!(allowed.admit(&request).unwrap_err(), AppAdmissionError::NotAllowed(AppId::new("knotlike")));
+    }
+
+    #[test]
+    fn a_declaration_rides_only_the_route_hello() {
+        let (declaration, _) = knotlike();
+        let mut legacy = AppHello::new(AppId::new("knotlike"));
+        legacy.declaration = Some(declaration.clone());
+        assert_eq!(legacy.accept().unwrap_err(), AppAdmissionError::DeclarationOnLegacyHello);
+        let hello = AppHello::for_route(AppId::new("knotlike"), AppRouteId::new("custody").unwrap())
+            .declaring(declaration);
+        let json = serde_json::to_string(&hello).unwrap();
+        assert_eq!(serde_json::from_str::<AppHello>(&json).unwrap(), hello);
+        let undeclared = AppHello::for_route(AppId::new("knotlike"), AppRouteId::new("custody").unwrap());
+        assert!(!serde_json::to_string(&undeclared).unwrap().contains("declaration"));
     }
 
     #[test]

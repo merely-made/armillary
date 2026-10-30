@@ -10,7 +10,7 @@ are gated out on Wasm.
 
 | Feature | API | Native | Wasm |
 | --- | --- | --- | --- |
-| `door` | Admission, route policy types, generic wire envelopes and bounded synchronous framing | Yes | Yes |
+| `door` | Admission, application declarations and owner grants, route policy types, generic wire envelopes and bounded synchronous framing | Yes | Yes |
 | `door-native` | Local endpoint discovery and application connections | Yes | Gated out |
 | `door-serve` | Listener, shared handshake and link binding | Yes | Gated out |
 | `custody` | Custody, payload and quarantine types | Yes | Gated out |
@@ -22,3 +22,11 @@ endpoint discovery. `custody-client` adds the client side of the protected
 custody boundary; the host retains custody dispatch, grants and secrets.
 `resident` orchestrates supplied services and shutdown actions, while the host
 chooses those services and their policy.
+
+An application may carry an `AppDeclaration` on its route hello: the routes it
+opens, the projections it offers and the custody operations and epoch
+derivations it needs. The host's `AppGrant` states what the owner lets it have.
+A declared connection receives only what both name; an application the owner
+grants by declaration must declare, and other applications keep label route
+grants. Declarations, like `AppId` labels, are statements within the same-user
+boundary, not executable authentication.

@@ -32,6 +32,8 @@ use personae::carry::{DeviceGrantSet, RemoteAuthRevocationOutcome};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::door::declaration::{AppAuthority, AuthorityRefusal, CustodyOperation};
+
 /// The resident route custody is served on.
 pub const CUSTODY_ROUTE: &str = "custody";
 
@@ -145,6 +147,41 @@ pub enum CustodyCall {
 }
 
 impl CustodyCall {
+    /// The call a named-persona wrapper carries, or this call.
+    pub fn unwrapped(&self) -> &Self {
+        match self {
+            Self::AsProfile { inner, .. } => inner.unwrapped(),
+            call => call,
+        }
+    }
+
+    /// Which operation this call is, for declarations and grants.
+    pub fn operation(&self) -> CustodyOperation {
+        match self.unwrapped() {
+            Self::Payload(_) => CustodyOperation::Payload,
+            Self::UnlockNative => CustodyOperation::UnlockNative,
+            Self::ChangePassphraseNative(_) => CustodyOperation::ChangePassphraseNative,
+            Self::UnassignedImports => CustodyOperation::UnassignedImports,
+            Self::AssignImport(_) => CustodyOperation::AssignImport,
+            Self::LockVault => CustodyOperation::LockVault,
+            Self::Quarantine { .. } => CustodyOperation::Quarantine,
+            Self::ReviewQuarantine(_) => CustodyOperation::ReviewQuarantine,
+            Self::Status => CustodyOperation::Status,
+            Self::Roster => CustodyOperation::Roster,
+            Self::VaultCommand { .. } => CustodyOperation::VaultCommand,
+            Self::ChooseProfile { .. } => CustodyOperation::ChooseProfile,
+            Self::CreateProfile { .. } => CustodyOperation::CreateProfile,
+            Self::Release { .. } => CustodyOperation::Release,
+            Self::Attest { .. } => CustodyOperation::Attest,
+            Self::Sign { .. } => CustodyOperation::Sign,
+            Self::IssueStationGrant { .. } => CustodyOperation::IssueStationGrant,
+            Self::RevokeDevice { .. } => CustodyOperation::RevokeDevice,
+            Self::WatchLock { .. } => CustodyOperation::WatchLock,
+            Self::ReleaseEpochKeys { .. } => CustodyOperation::ReleaseEpochKeys,
+            Self::AsProfile { .. } => unreachable!("unwrapped above"),
+        }
+    }
+
     /// Whether this call can be answered as a named persona
     /// ([`CustodyCall::AsProfile`]).
     pub fn answers_as_profile(&self) -> bool {
@@ -373,6 +410,36 @@ pub enum CustodyRefusal {
     /// The act failed inside djinn.
     #[error("failed: {reason}")]
     Failed { reason: String },
+    /// The application's declaration does not name this; nothing was tried.
+    #[error("undeclared: {what}")]
+    Undeclared { what: String },
+    /// The application declared this, and its owner has not granted it.
+    #[error("not granted: {what}")]
+    NotGranted { what: String },
+}
+
+impl From<AuthorityRefusal> for CustodyRefusal {
+    fn from(refusal: AuthorityRefusal) -> Self {
+        match refusal {
+            AuthorityRefusal::Undeclared { what, .. } => Self::Undeclared { what },
+            AuthorityRefusal::NotGranted { what, .. } => Self::NotGranted { what },
+        }
+    }
+}
+
+impl AppAuthority {
+    /// Whether this connection may make `call`: its operation, and each
+    /// epoch derivation it asks for, declared and granted. Salt policy for
+    /// releases, attestations and signatures stays the resident's.
+    pub fn admit_custody(&self, call: &CustodyCall) -> Result<(), CustodyRefusal> {
+        self.custody_operation(call.operation())?;
+        if let CustodyCall::ReleaseEpochKeys { keys, .. } = call.unwrapped() {
+            for key in keys {
+                self.epoch(&key.context, key.device_bound, key.public_only)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 pub(super) mod b64 {
@@ -522,5 +589,39 @@ mod tests {
             answer
         );
         assert!(!format!("{answer:?}").contains("90"));
+    }
+
+    #[test]
+    fn a_declared_app_is_refused_what_it_did_not_declare_or_was_not_granted() {
+        use crate::door::app_admission::AppId;
+        use crate::door::declaration::{AppDeclaration, AppGrant, CustodyUse, EpochUse, NamePattern};
+        let declaration = AppDeclaration {
+            custody: CustodyUse {
+                operations: [CustodyOperation::Status, CustodyOperation::ReleaseEpochKeys].into(),
+                epoch: vec![EpochUse::secret("app.vault", false)],
+            },
+            ..AppDeclaration::default()
+        };
+        let mut grant = AppGrant::new(AppId::new("app"));
+        grant.custody.operations = [CustodyOperation::Status, CustodyOperation::ReleaseEpochKeys, CustodyOperation::LockVault].into();
+        grant.custody.epoch = vec![NamePattern::prefix("app.")];
+        let authority = AppAuthority::new(declaration, grant);
+        let release = |context: &str| CustodyCall::ReleaseEpochKeys {
+            persona: Uuid::from_u128(7),
+            device_label: None,
+            keys: vec![EpochKeyRequest::secret(context, false)],
+        };
+        assert!(authority.admit_custody(&CustodyCall::Status).is_ok());
+        assert!(authority.admit_custody(&CustodyCall::AsProfile {
+            profile: ProfileId("p".into()),
+            inner: Box::new(CustodyCall::Status),
+        }).is_ok());
+        assert!(authority.admit_custody(&release("app.vault")).is_ok());
+        assert!(matches!(authority.admit_custody(&CustodyCall::LockVault), Err(CustodyRefusal::Undeclared { .. })));
+        assert!(matches!(authority.admit_custody(&release("app.other")), Err(CustodyRefusal::Undeclared { .. })));
+        let refusal = authority.admit_custody(&CustodyCall::Roster).unwrap_err();
+        assert_eq!(refusal, CustodyRefusal::Undeclared { what: "the custody operation roster".into() });
+        let text = serde_json::to_string(&refusal).unwrap();
+        assert_eq!(serde_json::from_str::<CustodyRefusal>(&text).unwrap(), refusal);
     }
 }
