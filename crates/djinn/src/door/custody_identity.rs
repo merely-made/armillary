@@ -44,7 +44,6 @@ use crate::door::app_admission::{AppId, configured_app_endpoint};
 use crate::door::app_client::AppClientError;
 use crate::door::custody::{CustodyAnswer, CustodyCall, KeySource, ResidentStatus};
 use crate::door::custody_client::{BlockingCustodyClient, CustodyClient, CustodyClientError};
-use crate::door::declaration::AppDeclaration;
 
 type JobCall = Box<dyn FnOnce(Option<&mut BlockingCustodyClient>) -> bool + Send>;
 struct Job {
@@ -94,7 +93,6 @@ impl Drop for StartingActor {
 pub struct CustodyIdentity {
     endpoint: String,
     app: AppId,
-    declaration: Option<AppDeclaration>,
     requested_profile: Option<ProfileId>,
     master: Ed25519PublicKey,
     status: ResidentStatus,
@@ -119,7 +117,7 @@ impl CustodyIdentity {
     /// A provider with bounded connection/status stages and bounded actor RPCs.
     /// Intended for cancellable off-thread setup; it never retries an operation.
     pub fn connect_timeout(app: &str, timeout: Duration) -> Result<Self, CustodyClientError> {
-        Self::connect_as_at_bounded(&configured_app_endpoint(), app, None, None, Some(timeout))
+        Self::connect_as_at_bounded(&configured_app_endpoint(), app, None, Some(timeout))
     }
 
     pub fn connect_at_timeout(
@@ -127,27 +125,7 @@ impl CustodyIdentity {
         app: &str,
         timeout: Duration,
     ) -> Result<Self, CustodyClientError> {
-        Self::connect_as_at_bounded(endpoint, app, None, None, Some(timeout))
-    }
-
-    /// [`Self::connect_timeout`] carrying `declaration` on every conversation,
-    /// so djinn answers only the custody it names and the owner grants.
-    pub fn connect_declared_timeout(
-        app: &str,
-        declaration: AppDeclaration,
-        timeout: Duration,
-    ) -> Result<Self, CustodyClientError> {
-        Self::connect_declared_at_timeout(&configured_app_endpoint(), app, declaration, timeout)
-    }
-
-    /// [`Self::connect_declared_timeout`] at an explicit endpoint.
-    pub fn connect_declared_at_timeout(
-        endpoint: &str,
-        app: &str,
-        declaration: AppDeclaration,
-        timeout: Duration,
-    ) -> Result<Self, CustodyClientError> {
-        Self::connect_as_at_bounded(endpoint, app, Some(declaration), None, Some(timeout))
+        Self::connect_as_at_bounded(endpoint, app, None, Some(timeout))
     }
 
     /// The same, at an explicit endpoint.
@@ -167,13 +145,12 @@ impl CustodyIdentity {
         app: &str,
         profile: Option<ProfileId>,
     ) -> Result<Self, CustodyClientError> {
-        Self::connect_as_at_bounded(endpoint, app, None, profile, None)
+        Self::connect_as_at_bounded(endpoint, app, profile, None)
     }
 
     fn connect_as_at_bounded(
         endpoint: &str,
         app: &str,
-        declaration: Option<AppDeclaration>,
         profile: Option<ProfileId>,
         timeout: Option<Duration>,
     ) -> Result<Self, CustodyClientError> {
@@ -183,17 +160,10 @@ impl CustodyIdentity {
         let remaining = || deadline.map(|end| end.saturating_duration_since(Instant::now()));
         let app = AppId::new(app);
         let requested_profile = profile.clone();
-        let opened_declaration = declaration.clone();
         let open = move |endpoint: &str, app: AppId, limit: Option<Duration>| {
-            let declaration = opened_declaration.clone();
-            let opened = match (limit, declaration) {
-                (Some(timeout), declaration) => {
-                    BlockingCustodyClient::open_at_timeout_with(endpoint, app, declaration, timeout)
-                }
-                (None, Some(declaration)) => {
-                    BlockingCustodyClient::open_declared_at(endpoint, app, declaration)
-                }
-                (None, None) => BlockingCustodyClient::open_at(endpoint, app),
+            let opened = match limit {
+                Some(timeout) => BlockingCustodyClient::open_at_timeout(endpoint, app, timeout),
+                None => BlockingCustodyClient::open_at(endpoint, app),
             };
             opened.map(|mut client| {
                 client.speak_as(profile.clone());
@@ -278,7 +248,6 @@ impl CustodyIdentity {
         let this = Self {
             endpoint: endpoint.to_owned(),
             app: app.clone(),
-            declaration: declaration.clone(),
             requested_profile,
             master,
             status,
@@ -291,7 +260,7 @@ impl CustodyIdentity {
             epoch: Arc::new(AtomicU64::new(1)),
             stop,
         };
-        this.watch(endpoint.to_string(), app, declaration);
+        this.watch(endpoint.to_string(), app);
         Ok(this)
     }
 
@@ -334,10 +303,9 @@ impl CustodyIdentity {
     pub fn status_timeout(&self, timeout: Duration) -> Result<ResidentStatus, CustodyClientError> {
         let endpoint = self.endpoint.clone();
         let app = self.app.clone();
-        let declaration = self.declaration.clone();
         let profile = self.requested_profile.clone();
         let result = bounded_worker(move || {
-            BlockingCustodyClient::status_at_timeout_with(&endpoint, app, declaration, profile, timeout)
+            BlockingCustodyClient::status_at_timeout(&endpoint, app, profile, timeout)
         });
         if self.status.custody_epoch.is_some()
             && !result
@@ -476,7 +444,7 @@ impl CustodyIdentity {
 
     /// Follow the lock broadcast on a second conversation: a Locked vault,
     /// or a djinn that went away, drops every held key (D11, D12).
-    fn watch(&self, endpoint: String, app: AppId, declaration: Option<AppDeclaration>) {
+    fn watch(&self, endpoint: String, app: AppId) {
         let held = Arc::clone(&self.held);
         let locked = Arc::clone(&self.locked);
         let epoch = Arc::clone(&self.epoch);
@@ -495,7 +463,7 @@ impl CustodyIdentity {
                     let opened = runtime.block_on(async {
                         tokio::select! {
                             _ = wait_stopped(&stop) => None,
-                            result = tokio::time::timeout(Duration::from_secs(2), CustodyClient::open_at_with(&endpoint, app.clone(), declaration.clone())) => Some(result),
+                            result = tokio::time::timeout(Duration::from_secs(2), CustodyClient::open_at(&endpoint, app.clone())) => Some(result),
                         }
                     });
                     let mut client = match opened {
@@ -588,7 +556,6 @@ mod epoch_tests {
         let identity = CustodyIdentity {
             endpoint: "/tmp/alembic-no-custody-runtime-test.sock".into(),
             app: AppId::new("turnstone"),
-            declaration: None,
             requested_profile: None,
             master,
             status: ResidentStatus {
@@ -705,7 +672,7 @@ mod epoch_tests {
             }
         });
         let (identity, _receiver) = actorless_fixture();
-        identity.watch(path.to_str().unwrap().into(), AppId::new("turnstone"), None);
+        identity.watch(path.to_str().unwrap().into(), AppId::new("turnstone"));
         accepted_rx
             .recv_timeout(Duration::from_secs(2))
             .expect("watcher connected");
@@ -1033,14 +1000,12 @@ impl CustodyIdentity {
         }
         let endpoint = self.endpoint.clone();
         let app = self.app.clone();
-        let declaration = self.declaration.clone();
         let profile = self.requested_profile.clone();
         let payload_timeout = remaining();
         let result = bounded_worker(move || {
-            match BlockingCustodyClient::call_at_timeout_with(
+            match BlockingCustodyClient::call_at_timeout(
                 &endpoint,
                 app,
-                declaration,
                 profile,
                 CustodyCall::Payload(request),
                 payload_timeout,
