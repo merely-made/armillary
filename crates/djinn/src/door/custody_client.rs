@@ -111,6 +111,18 @@ impl CustodyClient {
         app: AppId,
         declaration: AppDeclaration,
     ) -> Result<Self, CustodyClientError> {
+        Self::open_at_with(endpoint, app, Some(declaration)).await
+    }
+
+    /// Connect at `endpoint` as `app`, carrying `declaration` when there is one.
+    pub async fn open_at_with(
+        endpoint: &str,
+        app: AppId,
+        declaration: Option<AppDeclaration>,
+    ) -> Result<Self, CustodyClientError> {
+        let Some(declaration) = declaration else {
+            return Self::open_at(endpoint, app).await;
+        };
         let route = AppRouteId::new(CUSTODY_ROUTE).expect("the custody route id is valid");
         let inner = AppConnection::open_declared_route_at(endpoint, app, route, declaration)
             .await
@@ -338,9 +350,21 @@ impl BlockingCustodyClient {
         profile: Option<ProfileId>,
         timeout: std::time::Duration,
     ) -> Result<ResidentStatus, CustodyClientError> {
-        expect_status(Self::call_at_timeout(
+        Self::status_at_timeout_with(endpoint, app, None, profile, timeout)
+    }
+
+    /// [`Self::status_at_timeout`], carrying `declaration` when there is one.
+    pub fn status_at_timeout_with(
+        endpoint: &str,
+        app: AppId,
+        declaration: Option<AppDeclaration>,
+        profile: Option<ProfileId>,
+        timeout: std::time::Duration,
+    ) -> Result<ResidentStatus, CustodyClientError> {
+        expect_status(Self::call_at_timeout_with(
             endpoint,
             app,
+            declaration,
             profile,
             CustodyCall::Status,
             timeout,
@@ -356,13 +380,25 @@ impl BlockingCustodyClient {
         call: CustodyCall,
         timeout: std::time::Duration,
     ) -> Result<CustodyAnswer, CustodyClientError> {
+        Self::call_at_timeout_with(endpoint, app, None, profile, call, timeout)
+    }
+
+    /// [`Self::call_at_timeout`], carrying `declaration` when there is one.
+    pub fn call_at_timeout_with(
+        endpoint: &str,
+        app: AppId,
+        declaration: Option<AppDeclaration>,
+        profile: Option<ProfileId>,
+        call: CustodyCall,
+        timeout: std::time::Duration,
+    ) -> Result<CustodyAnswer, CustodyClientError> {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .map_err(|error| CustodyClientError::Absent(AppClientError::Io(error)))?;
         runtime.block_on(async {
             tokio::time::timeout(timeout, async {
-                let mut client = CustodyClient::open_at(endpoint, app).await?;
+                let mut client = CustodyClient::open_at_with(endpoint, app, declaration).await?;
                 client.speak_as(profile);
                 client.call(call).await
             })
@@ -410,7 +446,7 @@ impl BlockingCustodyClient {
             .enable_all()
             .build()
             .map_err(|error| CustodyClientError::Absent(AppClientError::Io(error)))?;
-        let client = runtime.block_on(CustodyClient::open_declared_at(endpoint, app, declaration))?;
+        let client = runtime.block_on(CustodyClient::open_at_with(endpoint, app, Some(declaration)))?;
         Ok(Self {
             runtime,
             client,
@@ -425,12 +461,22 @@ impl BlockingCustodyClient {
         app: AppId,
         timeout: std::time::Duration,
     ) -> Result<Self, CustodyClientError> {
+        Self::open_at_timeout_with(endpoint, app, None, timeout)
+    }
+
+    /// [`Self::open_at_timeout`], carrying `declaration` when there is one.
+    pub fn open_at_timeout_with(
+        endpoint: &str,
+        app: AppId,
+        declaration: Option<AppDeclaration>,
+        timeout: std::time::Duration,
+    ) -> Result<Self, CustodyClientError> {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .map_err(|error| CustodyClientError::Absent(AppClientError::Io(error)))?;
         let client = runtime.block_on(async {
-            tokio::time::timeout(timeout, CustodyClient::open_at(endpoint, app))
+            tokio::time::timeout(timeout, CustodyClient::open_at_with(endpoint, app, declaration))
                 .await
                 .map_err(|_| deadline_error())?
         })?;

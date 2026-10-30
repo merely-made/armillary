@@ -315,12 +315,10 @@ pub struct AllowedAppRoutes {
 }
 
 impl Default for AllowedAppRoutes {
+    /// Admit none: which applications a device serves is its owner's policy,
+    /// not this crate's.
     fn default() -> Self {
-        Self::new([(
-            AppId::new("turnstone"),
-            ResidentEndpointRoute::new(APP_IDENTITY_ROUTE, DEFAULT_IDENTITY_NOTICE_POLL)
-                .expect("the identity route is valid"),
-        )])
+        Self::none()
     }
 }
 
@@ -340,6 +338,21 @@ impl AllowedAppRoutes {
         let id = AppRouteId::new(route.id())
             .expect("ResidentEndpointRoute has already validated its id");
         self.routes.entry(app).or_default().insert(id, route);
+    }
+
+    /// Admit `app` to the identity route the version-one hello selects.
+    pub fn identity_for(app: AppId) -> Self {
+        Self::new([(
+            app,
+            ResidentEndpointRoute::new(APP_IDENTITY_ROUTE, DEFAULT_IDENTITY_NOTICE_POLL)
+                .expect("the identity route is valid"),
+        )])
+    }
+
+    /// The identity route as hosts serve it.
+    pub fn identity_route() -> ResidentEndpointRoute {
+        ResidentEndpointRoute::new(APP_IDENTITY_ROUTE, DEFAULT_IDENTITY_NOTICE_POLL)
+            .expect("the identity route is valid")
     }
 
     /// Admit none. A device that wants no first-party clients says so rather
@@ -595,7 +608,7 @@ mod tests {
     fn app_ids_are_case_and_space_insensitive() {
         assert_eq!(AppId::new("  Turnstone "), AppId::new("turnstone"));
         let request = AppHello::new(AppId::new("TURNSTONE")).accept().unwrap();
-        assert!(AllowedAppRoutes::default().admit(&request).is_ok());
+        assert!(AllowedAppRoutes::identity_for(AppId::new("turnstone")).admit(&request).is_ok());
     }
 
     #[test]
@@ -603,7 +616,7 @@ mod tests {
         let request = AppHello::new(AppId::new("someone-elses-app"))
             .accept()
             .unwrap();
-        let error = AllowedAppRoutes::default().admit(&request).unwrap_err();
+        let error = AllowedAppRoutes::identity_for(AppId::new("turnstone")).admit(&request).unwrap_err();
         assert_eq!(
             error,
             AppAdmissionError::NotAllowed(AppId::new("someone-elses-app"))
@@ -695,7 +708,7 @@ mod tests {
                 .accept()
                 .unwrap();
         assert_eq!(
-            AllowedAppRoutes::default().admit(&request).unwrap_err(),
+            AllowedAppRoutes::identity_for(AppId::new("turnstone")).admit(&request).unwrap_err(),
             AppAdmissionError::RouteNotGranted {
                 app: AppId::new("turnstone"),
                 route: AppRouteId::new("knot").unwrap(),

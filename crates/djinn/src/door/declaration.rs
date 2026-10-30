@@ -50,9 +50,17 @@ impl NamePattern {
 
     /// Whether `name` falls under this pattern.
     pub fn matches(&self, name: &str) -> bool {
+        self.matches_bytes(name.as_bytes())
+    }
+
+    /// Whether `bytes` fall under this pattern's UTF-8 text. A salt may carry
+    /// a binary suffix (a scope hash) after a text prefix.
+    pub fn matches_bytes(&self, bytes: &[u8]) -> bool {
         match self {
-            Self::Exact(exact) => name == exact,
-            Self::Prefix(prefix) => name.len() > prefix.len() && name.starts_with(prefix.as_str()),
+            Self::Exact(exact) => bytes == exact.as_bytes(),
+            Self::Prefix(prefix) => {
+                bytes.len() > prefix.len() && bytes.starts_with(prefix.as_bytes())
+            }
         }
     }
 
@@ -126,6 +134,103 @@ impl CustodyOperation {
     }
 }
 
+/// Which root a salt derives from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SaltSource {
+    /// The vault persona in use.
+    Persona,
+    /// The wallet.
+    Wallet,
+}
+
+/// How a namespace of salts is named.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SaltPattern {
+    /// Exactly this UTF-8 text.
+    Exact(String),
+    /// Any salt beginning with this UTF-8 text and longer than it. A salt may
+    /// carry a binary suffix (a scope hash or id) after the text.
+    Prefix(String),
+    /// Every delegation signing key in this capability domain: the salts
+    /// `insigne::delegation::delegation_signing_salt` derives for any resource
+    /// in it. Their framing is binary, so they are named by domain.
+    DelegationScope(String),
+}
+
+/// The bytes every delegation signing salt in `domain` begins with
+/// (`insigne::delegation::delegation_signing_prefix`): length-prefixed
+/// little-endian `u64` frames of the signing-key tag and the domain.
+pub fn delegation_scope_prefix(domain: &str) -> Vec<u8> {
+    const SIGNING_KEY_TAG: &[u8] = b"personae/delegation-signing-key/v1";
+    let mut bytes = Vec::with_capacity(16 + SIGNING_KEY_TAG.len() + domain.len());
+    bytes.extend_from_slice(&(SIGNING_KEY_TAG.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(SIGNING_KEY_TAG);
+    bytes.extend_from_slice(&(domain.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(domain.as_bytes());
+    bytes
+}
+
+impl SaltPattern {
+    fn matches(&self, salt: &[u8]) -> bool {
+        match self {
+            Self::Exact(text) => NamePattern::Exact(text.clone()).matches_bytes(salt),
+            Self::Prefix(text) => NamePattern::Prefix(text.clone()).matches_bytes(salt),
+            Self::DelegationScope(domain) => {
+                let prefix = delegation_scope_prefix(domain);
+                salt.len() > prefix.len() && salt.starts_with(&prefix)
+            }
+        }
+    }
+
+    fn validate(&self) -> Result<(), DeclarationError> {
+        match self {
+            Self::Exact(text) => NamePattern::Exact(text.clone()).validate(),
+            Self::Prefix(text) | Self::DelegationScope(text) => {
+                NamePattern::Prefix(text.clone()).validate()
+            }
+        }
+    }
+}
+
+/// A namespace of derived keys from one root.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SaltUse {
+    pub source: SaltSource,
+    pub name: SaltPattern,
+}
+
+impl SaltUse {
+    pub fn persona(name: SaltPattern) -> Self {
+        Self {
+            source: SaltSource::Persona,
+            name,
+        }
+    }
+
+    pub fn wallet(name: SaltPattern) -> Self {
+        Self {
+            source: SaltSource::Wallet,
+            name,
+        }
+    }
+
+    fn covers(&self, source: SaltSource, salt: &[u8]) -> bool {
+        self.source == source && self.name.matches(salt)
+    }
+}
+
+fn salt_display(salt: &[u8]) -> String {
+    let text = String::from_utf8_lossy(salt);
+    let mut shown: String = text.chars().take(64).collect();
+    if text.chars().count() > 64 {
+        shown.push('…');
+    }
+    shown
+}
+
 /// One epoch derivation an application needs: its context, whether it mixes
 /// in the device root, and whether its secret must leave or only its public
 /// key.
@@ -170,11 +275,21 @@ pub struct CustodyUse {
     /// The epoch derivations it asks for.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub epoch: Vec<EpochUse>,
+    /// The derived keys it asks to be released to it.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub salts: Vec<SaltUse>,
+    /// The derived keys it asks djinn to sign or attest with, never releasing
+    /// them. A released namespace may also be signed or attested with.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub acts: Vec<SaltUse>,
 }
 
 impl CustodyUse {
     pub fn is_empty(&self) -> bool {
-        self.operations.is_empty() && self.epoch.is_empty()
+        self.operations.is_empty()
+            && self.epoch.is_empty()
+            && self.salts.is_empty()
+            && self.acts.is_empty()
     }
 }
 
@@ -217,6 +332,8 @@ impl AppDeclaration {
         if self.routes.len() > MAX_DECLARED_ENTRIES
             || self.offers.len() > MAX_DECLARED_ENTRIES
             || self.custody.epoch.len() > MAX_DECLARED_ENTRIES
+            || self.custody.salts.len() > MAX_DECLARED_ENTRIES
+            || self.custody.acts.len() > MAX_DECLARED_ENTRIES
         {
             return Err(DeclarationError::TooLarge);
         }
@@ -233,12 +350,17 @@ impl AppDeclaration {
         for epoch in &self.custody.epoch {
             NamePattern::Exact(epoch.context.clone()).validate()?;
         }
-        Ok(())
+        self.custody
+            .salts
+            .iter()
+            .chain(&self.custody.acts)
+            .try_for_each(|used| used.name.validate())
     }
 }
 
-/// The custody an owner grants one application: which calls, and which
-/// epoch contexts, by namespace.
+/// The custody an owner grants one application: which calls, which epoch
+/// contexts, and which salts released or only signed and attested with, by
+/// namespace.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct CustodyGrant {
@@ -246,6 +368,10 @@ pub struct CustodyGrant {
     pub operations: BTreeSet<CustodyOperation>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub epoch: Vec<NamePattern>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub salts: Vec<SaltUse>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub acts: Vec<SaltUse>,
 }
 
 /// What the owner lets one declared application have.
@@ -279,10 +405,22 @@ impl AppGrant {
         if self.app.as_str().is_empty() || self.app.as_str().len() > MAX_DECLARED_NAME {
             return Err(DeclarationError::InvalidName(self.app.as_str().chars().take(64).collect()));
         }
-        if self.routes.len() > MAX_DECLARED_ENTRIES || self.custody.epoch.len() > MAX_DECLARED_ENTRIES {
+        if self.routes.len() > MAX_DECLARED_ENTRIES
+            || self.custody.epoch.len() > MAX_DECLARED_ENTRIES
+            || self.custody.salts.len() > MAX_DECLARED_ENTRIES
+            || self.custody.acts.len() > MAX_DECLARED_ENTRIES
+        {
             return Err(DeclarationError::TooLarge);
         }
-        self.routes.iter().chain(&self.custody.epoch).try_for_each(NamePattern::validate)
+        self.routes
+            .iter()
+            .chain(&self.custody.epoch)
+            .try_for_each(NamePattern::validate)?;
+        self.custody
+            .salts
+            .iter()
+            .chain(&self.custody.acts)
+            .try_for_each(|used| used.name.validate())
     }
 }
 
@@ -363,6 +501,31 @@ impl AppAuthority {
         Ok(())
     }
 
+    /// Whether the key `salt` derives from `source` may leave for this
+    /// connection (`released`), or only be signed or attested with. A released
+    /// namespace covers signing and attesting too.
+    pub fn salt(&self, source: SaltSource, salt: &[u8], released: bool) -> Result<(), AuthorityRefusal> {
+        let what = || {
+            let root = match source {
+                SaltSource::Persona => "persona",
+                SaltSource::Wallet => "wallet",
+            };
+            let act = if released { "release of" } else { "signature with" };
+            format!("the {act} {root} key {}", salt_display(salt))
+        };
+        let covered = |salts: &[SaltUse], acts: &[SaltUse]| {
+            salts.iter().any(|used| used.covers(source, salt))
+                || (!released && acts.iter().any(|used| used.covers(source, salt)))
+        };
+        if !covered(&self.declaration.custody.salts, &self.declaration.custody.acts) {
+            return Err(self.undeclared(what()));
+        }
+        if !covered(&self.grant.custody.salts, &self.grant.custody.acts) {
+            return Err(self.not_granted(what()));
+        }
+        Ok(())
+    }
+
     /// The offer this connection declared under `route`, if any. Whether
     /// the owner lets it serve that offer is the host's projection policy.
     pub fn offer(&self, route: &AppRouteId) -> Result<&OfferedProjection, AuthorityRefusal> {
@@ -400,6 +563,7 @@ mod tests {
             custody: CustodyUse {
                 operations: [CustodyOperation::Status, CustodyOperation::ReleaseEpochKeys].into(),
                 epoch: vec![EpochUse::secret("app.vault.v1", false), EpochUse::public("app.writer.v1", false)],
+                ..CustodyUse::default()
             },
         }
     }
@@ -411,6 +575,7 @@ mod tests {
             custody: CustodyGrant {
                 operations: [CustodyOperation::Status, CustodyOperation::ReleaseEpochKeys, CustodyOperation::Sign].into(),
                 epoch: vec![NamePattern::prefix("app.")],
+                ..CustodyGrant::default()
             },
         }
     }
@@ -455,6 +620,49 @@ mod tests {
             AppAuthority::new(declaration(), other).epoch("app.vault.v1", false, false),
             Err(AuthorityRefusal::NotGranted { .. })
         ));
+    }
+
+    #[test]
+    fn salts_match_text_prefixes_over_bytes_and_acts_never_release() {
+        let mut declaration = declaration();
+        declaration.custody.salts = vec![SaltUse::persona(SaltPattern::Prefix("app.place.".into()))];
+        declaration.custody.acts = vec![SaltUse::persona(SaltPattern::Prefix("app/delegation/".into()))];
+        let mut wide = grant();
+        wide.custody.salts = vec![SaltUse::persona(SaltPattern::Prefix("app.".into()))];
+        wide.custody.acts = vec![SaltUse::persona(SaltPattern::Prefix("app/".into()))];
+        let authority = AppAuthority::new(declaration, wide);
+        assert!(authority.salt(SaltSource::Persona, b"app.place.p1", true).is_ok());
+        assert!(authority.salt(SaltSource::Persona, b"app.place.p1", false).is_ok(), "released covers acts");
+        let binary = [b"app/delegation/".as_slice(), &[0xff, 0x00, 0x9c]].concat();
+        assert!(authority.salt(SaltSource::Persona, &binary, false).is_ok(), "a binary suffix after a text prefix");
+        assert!(matches!(authority.salt(SaltSource::Persona, &binary, true), Err(AuthorityRefusal::Undeclared { .. })), "an act never releases");
+        assert!(matches!(authority.salt(SaltSource::Wallet, b"app.place.p1", true), Err(AuthorityRefusal::Undeclared { .. })), "the root matters");
+        assert!(matches!(authority.salt(SaltSource::Persona, b"app.place.", true), Err(AuthorityRefusal::Undeclared { .. })), "a prefix needs more");
+        assert!(matches!(authority.salt(SaltSource::Persona, b"", false), Err(AuthorityRefusal::Undeclared { .. })), "never the master's place");
+
+        let mut narrow = grant();
+        narrow.custody.acts = vec![SaltUse::persona(SaltPattern::Prefix("app/".into()))];
+        let mut declaration = super::tests::declaration();
+        declaration.custody.salts = vec![SaltUse::persona(SaltPattern::Prefix("app.place.".into()))];
+        let authority = AppAuthority::new(declaration, narrow);
+        assert!(matches!(authority.salt(SaltSource::Persona, b"app.place.p1", true), Err(AuthorityRefusal::NotGranted { .. })));
+    }
+
+    #[test]
+    fn a_delegation_scope_names_every_resource_in_its_domain() {
+        let mut declaration = AppDeclaration::default();
+        declaration.custody.salts = vec![SaltUse::persona(SaltPattern::DelegationScope("mere.knot".into()))];
+        let mut wide = grant();
+        wide.custody.salts = declaration.custody.salts.clone();
+        assert!(declaration.validate().is_ok(), "the domain is text even though the salt is not");
+        let authority = AppAuthority::new(declaration, wide);
+        let salt = [delegation_scope_prefix("mere.knot"), vec![32, 0, 0, 0, 0, 0, 0, 0, 0xab]].concat();
+        assert!(authority.salt(SaltSource::Persona, &salt, true).is_ok());
+        let other = [delegation_scope_prefix("mere.knots"), vec![1]].concat();
+        assert!(authority.salt(SaltSource::Persona, &other, true).is_err(), "the domain is length-framed");
+        assert!(authority.salt(SaltSource::Persona, &delegation_scope_prefix("mere.knot"), true).is_err());
+        let json = serde_json::to_value(SaltUse::persona(SaltPattern::DelegationScope("moot".into()))).unwrap();
+        assert_eq!(json, serde_json::json!({"source": "persona", "name": {"delegation_scope": "moot"}}));
     }
 
     #[test]

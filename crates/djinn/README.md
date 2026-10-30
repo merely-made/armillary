@@ -24,9 +24,12 @@ custody boundary; the host retains custody dispatch, grants and secrets.
 chooses those services and their policy.
 
 An application may carry an `AppDeclaration` on its route hello: the routes it
-opens, the projections it offers and the custody operations and epoch
-derivations it needs. The host's `AppGrant` states what the owner lets it have.
+opens, the projections it offers and the custody operations, epoch
+derivations and salt namespaces it needs (released, or only signed and
+attested with). Salts are named as UTF-8 text matched against their bytes, or
+by delegation domain for insigne's binary-framed delegation signing keys. The host's `AppGrant` states what the owner lets it have.
 A declared connection receives only what both name; an application the owner
 grants by declaration must declare, and other applications keep label route
-grants. Declarations, like `AppId` labels, are statements within the same-user
+grants. `AllowedAppRoutes::default()` admits no application; hosts name their
+own. Declarations, like `AppId` labels, are statements within the same-user
 boundary, not executable authentication.
