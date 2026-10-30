@@ -4,6 +4,7 @@ members = [
     "crates/armillary",
     "crates/apparatus-core",
     "crates/djinn",
+    "crates/peer-facts",
 ]
 
 [workspace.package]

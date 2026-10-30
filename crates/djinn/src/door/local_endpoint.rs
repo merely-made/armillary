@@ -85,6 +85,17 @@ impl LocalListener {
         H: Fn(Box<dyn LocalStream>) -> F + Clone + Send + 'static,
         F: Future<Output = ()> + Send + 'static,
     {
+        self.serve_with_peer(move |stream, _peer| handle(stream)).await
+    }
+
+    /// [`Self::serve`], handing each connection with what the OS says about
+    /// its peer. `None` where the OS would not say; Windows connections from
+    /// another user are refused before this.
+    pub async fn serve_with_peer<H, F>(self, handle: H) -> Result<(), std::io::Error>
+    where
+        H: Fn(Box<dyn LocalStream>, Option<peer_facts::Peer>) -> F + Clone + Send + 'static,
+        F: Future<Output = ()> + Send + 'static,
+    {
         serve_platform(self, handle).await
     }
 }
@@ -149,7 +160,7 @@ where
 #[cfg(windows)]
 async fn serve_platform<H, F>(listener: LocalListener, handle: H) -> Result<(), std::io::Error>
 where
-    H: Fn(Box<dyn LocalStream>) -> F + Clone + Send + 'static,
+    H: Fn(Box<dyn LocalStream>, Option<peer_facts::Peer>) -> F + Clone + Send + 'static,
     F: Future<Output = ()> + Send + 'static,
 {
     use tokio::net::windows::named_pipe::ServerOptions;
@@ -166,11 +177,14 @@ where
         server = ServerOptions::new().create(&endpoint)?;
         let handle = handle.clone();
         armillary::tasks::spawn_tracked(async move {
-            if let Err(error) = verify_same_user(&connection) {
-                tracing::warn!(%error, door = what, "rejected a client of another user");
-                return;
-            }
-            handle(Box::new(connection)).await;
+            let peer = match verify_same_user(&connection) {
+                Ok(peer) => peer,
+                Err(error) => {
+                    tracing::warn!(%error, door = what, "rejected a client of another user");
+                    return;
+                }
+            };
+            handle(Box::new(connection), Some(peer)).await;
         });
     }
 }
@@ -179,15 +193,19 @@ where
 #[cfg(not(windows))]
 async fn serve_platform<H, F>(listener: LocalListener, handle: H) -> Result<(), std::io::Error>
 where
-    H: Fn(Box<dyn LocalStream>) -> F + Clone + Send + 'static,
+    H: Fn(Box<dyn LocalStream>, Option<peer_facts::Peer>) -> F + Clone + Send + 'static,
     F: Future<Output = ()> + Send + 'static,
 {
+    use std::os::fd::AsRawFd;
+
     let LocalListener { listener, .. } = listener;
     loop {
         let (connection, _) = listener.accept().await?;
+        // The socket's mode already limits it to this user; record who.
+        let peer = peer_facts::unix_peer(connection.as_raw_fd()).ok();
         let handle = handle.clone();
         armillary::tasks::spawn_tracked(async move {
-            handle(Box::new(connection)).await;
+            handle(Box::new(connection), peer).await;
         });
     }
 }
@@ -302,7 +320,7 @@ fn validate_endpoint_owner(
     Ok(())
 }
 
-/// Compare the peer's user against this process's.
+/// Compare the peer's user against this process's, and return the peer.
 ///
 /// Unix gets this from the socket's mode. Windows named pipes are reachable by
 /// other users on the machine unless the server checks, so the server checks.
@@ -310,91 +328,20 @@ fn validate_endpoint_owner(
 #[cfg(windows)]
 fn verify_same_user(
     connection: &tokio::net::windows::named_pipe::NamedPipeServer,
-) -> Result<(), std::io::Error> {
+) -> Result<peer_facts::Peer, std::io::Error> {
     use std::os::windows::io::AsRawHandle;
-    use windows_sys::Win32::Foundation::HANDLE;
-    use windows_sys::Win32::Security::{EqualSid, TOKEN_USER};
-    use windows_sys::Win32::System::Pipes::GetNamedPipeClientProcessId;
-    use windows_sys::Win32::System::Threading::{
-        GetCurrentProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    };
 
-    let mut client_pid = 0u32;
-    if unsafe { GetNamedPipeClientProcessId(connection.as_raw_handle() as HANDLE, &mut client_pid) }
-        == 0
-    {
-        return Err(std::io::Error::last_os_error());
-    }
-    let client_process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, client_pid) };
-    if client_process.is_null() {
-        return Err(std::io::Error::last_os_error());
-    }
-    let client_process = OwnedHandle(client_process);
-    let current_user = token_user(unsafe { GetCurrentProcess() })?;
-    let client_user = token_user(client_process.0)?;
-    let current = unsafe { &*(current_user.as_ptr().cast::<TOKEN_USER>()) };
-    let client = unsafe { &*(client_user.as_ptr().cast::<TOKEN_USER>()) };
-    if unsafe { EqualSid(current.User.Sid, client.User.Sid) } == 0 {
+    let peer = peer_facts::pipe_client_peer(connection.as_raw_handle() as _)?;
+    let peer_facts::Peer::Windows { sid, .. } = &peer else {
+        return Err(std::io::Error::other("a pipe client reported a non-Windows peer"));
+    };
+    if *sid != peer_facts::current_user_sid()? {
         return Err(std::io::Error::new(
             std::io::ErrorKind::PermissionDenied,
             "the client belongs to another Windows user",
         ));
     }
-    Ok(())
-}
-
-#[cfg(feature = "door-serve")]
-#[cfg(windows)]
-fn token_user(
-    process: windows_sys::Win32::Foundation::HANDLE,
-) -> Result<Vec<usize>, std::io::Error> {
-    use windows_sys::Win32::Foundation::HANDLE;
-    use windows_sys::Win32::Security::{GetTokenInformation, TOKEN_QUERY, TokenUser};
-    use windows_sys::Win32::System::Threading::OpenProcessToken;
-
-    let mut token: HANDLE = std::ptr::null_mut();
-    if unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) } == 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let token = OwnedHandle(token);
-    let mut byte_len = 0u32;
-    unsafe {
-        GetTokenInformation(token.0, TokenUser, std::ptr::null_mut(), 0, &mut byte_len);
-    }
-    if byte_len == 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let word_len = (byte_len as usize).div_ceil(std::mem::size_of::<usize>());
-    let mut buffer = vec![0usize; word_len];
-    if unsafe {
-        GetTokenInformation(
-            token.0,
-            TokenUser,
-            buffer.as_mut_ptr().cast(),
-            byte_len,
-            &mut byte_len,
-        )
-    } == 0
-    {
-        return Err(std::io::Error::last_os_error());
-    }
-    Ok(buffer)
-}
-
-#[cfg(feature = "door-serve")]
-#[cfg(windows)]
-struct OwnedHandle(windows_sys::Win32::Foundation::HANDLE);
-
-#[cfg(feature = "door-serve")]
-#[cfg(windows)]
-impl Drop for OwnedHandle {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            unsafe {
-                windows_sys::Win32::Foundation::CloseHandle(self.0);
-            }
-        }
-    }
+    Ok(peer)
 }
 
 #[cfg(feature = "door-serve")]
@@ -483,6 +430,36 @@ mod unix_tests {
             .expect("missing endpoint needs no cleanup");
 
         assert!(!endpoint.exists());
+        std::fs::remove_dir_all(directory).expect("remove scratch");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn each_connection_arrives_with_what_the_os_says_about_its_peer() {
+        let directory = scratch("peer");
+        std::fs::create_dir_all(&directory).expect("create scratch");
+        let endpoint = directory.join("resident.sock");
+        let listener = LocalListener::bind(endpoint.to_str().expect("endpoint path"), "test")
+            .await
+            .expect("bind local endpoint");
+        let (seen, mut received) = tokio::sync::mpsc::unbounded_channel();
+        let server = tokio::spawn(listener.serve_with_peer(move |_stream, peer| {
+            let seen = seen.clone();
+            async move {
+                let _ = seen.send(peer);
+            }
+        }));
+        let _client = tokio::net::UnixStream::connect(&endpoint).await.expect("connect");
+        let peer = received.recv().await.expect("a connection");
+        match peer {
+            Some(peer_facts::Peer::Unix { uid, pid, .. }) => {
+                assert_eq!(uid, peer_facts::effective_uid());
+                if let Some(pid) = pid {
+                    assert_eq!(pid as u32, std::process::id());
+                }
+            }
+            other => panic!("expected a Unix peer, got {other:?}"),
+        }
+        server.abort();
         std::fs::remove_dir_all(directory).expect("remove scratch");
     }
 

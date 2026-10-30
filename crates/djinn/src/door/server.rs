@@ -32,6 +32,9 @@ pub enum AppServerError {
 pub struct AdmittedApp {
     pub app: AppId,
     pub route: ResidentEndpointRoute,
+    /// What the OS said about the peer when it connected, where it would say.
+    /// The label above is the application's own statement; this is not.
+    pub peer: Option<peer_facts::Peer>,
     /// What the connection declared and its owner granted; `None` for an
     /// application admitted by label alone.
     pub authority: Option<AppAuthority>,
@@ -44,7 +47,18 @@ where
     H: Fn(Box<dyn LocalStream>, AllowedAppRoutes) -> F + Clone + Send + Sync + 'static,
     F: Future<Output = ()> + Send + 'static,
 {
-    listener.serve(move |stream| handle(stream, grants.current())).await
+    serve_on_with_peer(listener, grants, move |stream, allowed, _peer| handle(stream, allowed)).await
+}
+
+/// [`serve_on`], handing each connection with what the OS says about its peer.
+pub async fn serve_on_with_peer<H, F>(listener: LocalListener, grants: AppRouteGrants, handle: H) -> std::io::Result<()>
+where
+    H: Fn(Box<dyn LocalStream>, AllowedAppRoutes, Option<peer_facts::Peer>) -> F + Clone + Send + Sync + 'static,
+    F: Future<Output = ()> + Send + 'static,
+{
+    listener
+        .serve_with_peer(move |stream, peer| handle(stream, grants.current(), peer))
+        .await
 }
 
 /// Resolve the host-owned route and complete the common connect exchange.
@@ -55,11 +69,25 @@ where
     R: AsyncRead + Unpin,
     Resolve: FnOnce(&AppRequest, &AllowedAppRoutes) -> Result<ResidentEndpointRoute, AppAdmissionError>,
 {
+    admit_from(reader, None, allowed, resolve).await
+}
+
+/// [`admit`], recording what the OS said about the connection's peer.
+pub async fn admit_from<R, Resolve>(
+    reader: &mut R,
+    peer: Option<peer_facts::Peer>,
+    allowed: &AllowedAppRoutes,
+    resolve: Resolve,
+) -> Result<AdmittedApp, AppServerError>
+where
+    R: AsyncRead + Unpin,
+    Resolve: FnOnce(&AppRequest, &AllowedAppRoutes) -> Result<ResidentEndpointRoute, AppAdmissionError>,
+{
     let hello = read_native_message_async::<_, AppHello>(reader).await?.ok_or(AppServerError::MissingHello)?;
     let request = hello.accept()?;
     let route = resolve(&request, allowed)?;
     let authority = allowed.authority(&request);
-    Ok(AdmittedApp { app: request.app, route, authority })
+    Ok(AdmittedApp { app: request.app, route, peer, authority })
 }
 
 /// Complete connect after the adapter has captured its per-session surface.

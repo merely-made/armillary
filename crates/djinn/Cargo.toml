@@ -11,7 +11,7 @@ description = "Application door protocol and resident lifetime."
 default = []
 door = ["dep:serde", "dep:serde_json", "dep:thiserror", "dep:zeroize"]
 door-native = ["door", "dep:tokio", "dep:base64", "dep:rand_core", "dep:personae"]
-door-serve = ["door-native", "dep:armillary", "armillary/tokio", "dep:tracing", "dep:libc", "dep:windows-sys", "dep:blake3"]
+door-serve = ["door-native", "dep:armillary", "armillary/tokio", "dep:tracing", "dep:libc", "dep:windows-sys", "dep:blake3", "dep:peer-facts"]
 custody = ["door", "dep:base64", "dep:chatelaine", "dep:dramatis", "dep:eidetic", "dep:insigne", "dep:personae", "dep:uuid"]
 custody-client = ["custody", "door-native", "dep:tracing"]
 resident = ["dep:armillary", "armillary/tokio", "dep:tokio"]
@@ -22,6 +22,7 @@ serde_json = { version = "1", optional = true }
 thiserror = { version = "1", optional = true }
 zeroize = { version = "1", optional = true }
 armillary = { path = "../armillary", optional = true }
+peer-facts = { path = "../peer-facts", optional = true }
 
 [target.'cfg(all(not(target_arch = "wasm32"), any(unix, windows)))'.dependencies]
 tokio = { version = "1", features = ["io-util", "rt", "rt-multi-thread", "net", "time", "sync", "macros"], optional = true }
