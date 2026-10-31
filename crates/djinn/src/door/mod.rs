@@ -36,6 +36,12 @@ pub mod frame;
     any(unix, windows),
     not(target_arch = "wasm32")
 ))]
+pub mod launch;
+#[cfg(all(
+    feature = "door-native",
+    any(unix, windows),
+    not(target_arch = "wasm32")
+))]
 pub mod local_endpoint;
 #[cfg(all(feature = "custody", any(unix, windows), not(target_arch = "wasm32")))]
 pub mod quarantine;

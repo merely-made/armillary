@@ -33,7 +33,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::door::declaration::{AppAuthority, AppDeclaration, AppGrant, DeclarationError};
+use crate::door::declaration::{AppAuthority, AppDeclaration, AppGrant, DeclarationError, IdentityBasis};
 use crate::door::route::ResidentEndpointRoute;
 
 /// Environment override for the first-party application endpoint.
@@ -150,6 +150,10 @@ pub enum AppAdmissionError {
     DeclarationRequired(AppId),
     /// The application's declaration does not name this route.
     RouteUndeclared { app: AppId, route: AppRouteId },
+    /// The owner pinned this label to an OS identity the peer does not have.
+    IdentityMismatch { app: AppId, expected: String },
+    /// The hello's launch handle was malformed.
+    InvalidLaunch,
 }
 
 impl std::fmt::Display for AppAdmissionError {
@@ -188,6 +192,10 @@ impl std::fmt::Display for AppAdmissionError {
             Self::RouteUndeclared { app, route } => {
                 write!(f, "{app} did not declare the resident route {route}")
             }
+            Self::IdentityMismatch { app, expected } => {
+                write!(f, "the peer is not {app}: the owner pinned it to {expected}")
+            }
+            Self::InvalidLaunch => f.write_str("the hello's launch handle is malformed"),
         }
     }
 }
@@ -209,6 +217,10 @@ pub struct AppHello {
     /// only; absent keeps the hello byte-shaped for clients that predate it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub declaration: Option<AppDeclaration>,
+    /// The handle Djinn launched this process with, as 64 hex digits.
+    /// Version two only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub launch: Option<String>,
 }
 
 impl AppHello {
@@ -219,6 +231,7 @@ impl AppHello {
             app,
             route: None,
             declaration: None,
+            launch: None,
         }
     }
 
@@ -229,7 +242,14 @@ impl AppHello {
             app,
             route: Some(route),
             declaration: None,
+            launch: None,
         }
+    }
+
+    /// Carry the handle Djinn launched this process with.
+    pub fn launched(mut self, handle: LaunchHandle) -> Self {
+        self.launch = Some(handle.to_hex());
+        self
     }
 
     /// Carry `declaration` on a route-aware hello.
@@ -251,7 +271,7 @@ impl AppHello {
                 if self.route.is_some() {
                     return Err(AppAdmissionError::RouteOnLegacyHello);
                 }
-                if self.declaration.is_some() {
+                if self.declaration.is_some() || self.launch.is_some() {
                     return Err(AppAdmissionError::DeclarationOnLegacyHello);
                 }
                 AppRouteId::identity()
@@ -269,10 +289,16 @@ impl AppHello {
                 .validate()
                 .map_err(AppAdmissionError::InvalidDeclaration)?;
         }
+        let launch = self
+            .launch
+            .as_deref()
+            .map(|hex| LaunchHandle::from_hex(hex).ok_or(AppAdmissionError::InvalidLaunch))
+            .transpose()?;
         Ok(AppRequest {
             app,
             route,
             declaration: self.declaration,
+            launch,
         })
     }
 }
@@ -284,6 +310,8 @@ pub struct AppRequest {
     pub route: AppRouteId,
     /// The application's declaration, when its hello carried one.
     pub declaration: Option<AppDeclaration>,
+    /// The handle Djinn launched the process with, when its hello carried one.
+    pub launch: Option<LaunchHandle>,
 }
 
 impl AppRequest {
@@ -294,7 +322,46 @@ impl AppRequest {
             app,
             route,
             declaration: None,
+            launch: None,
         }
+    }
+}
+
+/// A one-time secret Djinn hands a process it launches, by a pipe the child
+/// reads once. A connection carrying it is the launched process (or one it
+/// shared the secret with): within the same-user boundary, the Linux basis
+/// for an application's label.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LaunchHandle([u8; 32]);
+
+impl LaunchHandle {
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    pub fn to_hex(&self) -> String {
+        self.0.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        if hex.len() != 64 || !hex.is_ascii() {
+            return None;
+        }
+        let mut bytes = [0u8; 32];
+        for (index, byte) in bytes.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).ok()?;
+        }
+        Some(Self(bytes))
+    }
+}
+
+impl std::fmt::Debug for LaunchHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("LaunchHandle(..)")
     }
 }
 
@@ -312,6 +379,8 @@ pub struct AllowedAppRoutes {
     grants: BTreeMap<AppId, AppGrant>,
     /// Routes the host serves to declared applications whose grant names them.
     served: BTreeMap<AppRouteId, ResidentEndpointRoute>,
+    /// Live launch handles, each naming the application Djinn launched with it.
+    launches: BTreeMap<LaunchHandle, AppId>,
 }
 
 impl Default for AllowedAppRoutes {
@@ -351,6 +420,7 @@ impl AllowedAppRoutes {
             denied: BTreeSet::new(),
             grants: BTreeMap::new(),
             served: BTreeMap::new(),
+            launches: BTreeMap::new(),
         }
     }
 
@@ -432,6 +502,80 @@ impl AllowedAppRoutes {
     /// any earlier grant for it.
     pub fn grant_app(&mut self, grant: AppGrant) {
         self.grants.insert(grant.app.clone(), grant);
+    }
+
+    /// Accept `handle` as `app`'s launch, until [`Self::end_launch`].
+    pub fn begin_launch(&mut self, handle: LaunchHandle, app: AppId) {
+        self.launches.insert(handle, app);
+    }
+
+    /// Stop accepting `handle`: its process exited.
+    pub fn end_launch(&mut self, handle: &LaunchHandle) {
+        self.launches.remove(handle);
+    }
+
+    /// The application a live launch handle names.
+    pub fn identify_launch(&self, handle: &LaunchHandle) -> Option<&AppId> {
+        self.launches.get(handle)
+    }
+
+    /// How many launch handles are live.
+    pub fn launch_count(&self) -> usize {
+        self.launches.len()
+    }
+
+    /// What `request`'s label rests on, given what the OS said about the
+    /// peer. Where the owner pinned an identity for this platform, a peer
+    /// without it is refused; elsewhere the label stands as development mode.
+    #[cfg(feature = "door-serve")]
+    pub fn identify(
+        &self,
+        request: &AppRequest,
+        connected: Option<&peer_facts::Connected>,
+    ) -> Result<IdentityBasis, AppAdmissionError> {
+        let Some(pinned) = self.grants.get(&request.app).and_then(|grant| grant.identity.as_ref()) else {
+            return Ok(IdentityBasis::Development);
+        };
+        let mismatch = |expected: String| AppAdmissionError::IdentityMismatch {
+            app: request.app.clone(),
+            expected,
+        };
+        if cfg!(target_os = "macos") {
+            if let Some(signed) = &pinned.macos {
+                return match connected.is_some_and(|c| c.signed_as(&signed.team, &signed.identifier)) {
+                    true => Ok(IdentityBasis::Signed {
+                        team: signed.team.clone(),
+                        identifier: signed.identifier.clone(),
+                    }),
+                    false => Err(mismatch(format!("code signed by {} as {}", signed.team, signed.identifier))),
+                };
+            }
+        }
+        if cfg!(windows) {
+            if let Some(windows) = &pinned.windows {
+                let image = connected.and_then(|c| match &c.peer {
+                    peer_facts::Peer::Windows { image, .. } => image.clone(),
+                    _ => None,
+                });
+                return match image.filter(|image| windows.matches(image)) {
+                    Some(image) => Ok(IdentityBasis::WindowsImage { image }),
+                    None => Err(mismatch(format!("the executable {}", windows.image))),
+                };
+            }
+        }
+        if cfg!(target_os = "linux") {
+            if pinned.linux.is_some() {
+                let launched = request
+                    .launch
+                    .as_ref()
+                    .and_then(|handle| self.launches.get(handle));
+                return match launched == Some(&request.app) {
+                    true => Ok(IdentityBasis::Launched),
+                    false => Err(mismatch("a process Djinn launched".into())),
+                };
+            }
+        }
+        Ok(IdentityBasis::Development)
     }
 
     /// The owner grant for a declared application.
@@ -627,6 +771,7 @@ mod tests {
             app: AppId::new("turnstone"),
             route: None,
             declaration: None,
+            launch: None,
         };
         let error = wrong.accept().unwrap_err();
         assert!(matches!(error, AppAdmissionError::WrongSchema(_)));
@@ -681,6 +826,7 @@ mod tests {
             app: AppId::new("turnstone"),
             route: Some(AppRouteId::new("knot").unwrap()),
             declaration: None,
+            launch: None,
         };
         assert_eq!(
             hello.accept().unwrap_err(),
@@ -820,6 +966,107 @@ mod tests {
         assert_eq!(serde_json::from_str::<AppHello>(&json).unwrap(), hello);
         let undeclared = AppHello::for_route(AppId::new("knotlike"), AppRouteId::new("custody").unwrap());
         assert!(!serde_json::to_string(&undeclared).unwrap().contains("declaration"));
+    }
+
+    #[cfg(feature = "door-serve")]
+    fn pinned(identity: crate::door::declaration::AppIdentity) -> AllowedAppRoutes {
+        let (_, mut grant) = knotlike();
+        grant.identity = Some(identity);
+        let mut allowed = AllowedAppRoutes::none();
+        allowed.grant_app(grant);
+        allowed
+    }
+
+    #[cfg(feature = "door-serve")]
+    #[test]
+    fn an_unpinned_label_is_development_mode() {
+        use crate::door::declaration::IdentityBasis;
+        let (declaration, grant) = knotlike();
+        let mut allowed = AllowedAppRoutes::none();
+        allowed.grant_app(grant);
+        let request = declared_request(&declaration, "custody");
+        assert_eq!(allowed.identify(&request, None).unwrap(), IdentityBasis::Development);
+        let other_platform = pinned(crate::door::declaration::AppIdentity {
+            windows: Some(crate::door::declaration::WindowsAppIdentity { image: r"C:\Knot\knot.exe".into() }),
+            ..Default::default()
+        });
+        if !cfg!(windows) {
+            assert_eq!(
+                other_platform.identify(&request, None).unwrap(),
+                IdentityBasis::Development,
+                "a pin for another platform leaves this one in development mode"
+            );
+        }
+    }
+
+    #[cfg(all(feature = "door-serve", target_os = "macos"))]
+    #[test]
+    fn a_macos_pin_refuses_an_unsigned_peer() {
+        use std::os::fd::AsRawFd;
+        let allowed = pinned(crate::door::declaration::AppIdentity {
+            macos: Some(crate::door::declaration::SignedAppIdentity {
+                team: "ABCDE12345".into(),
+                identifier: "com.merely.knot".into(),
+            }),
+            ..Default::default()
+        });
+        let (declaration, _) = knotlike();
+        let request = declared_request(&declaration, "custody");
+        let (a, _b) = std::os::unix::net::UnixStream::pair().unwrap();
+        let connected = peer_facts::Connected::unix(a.as_raw_fd()).unwrap();
+        assert!(matches!(
+            allowed.identify(&request, Some(&connected)),
+            Err(AppAdmissionError::IdentityMismatch { .. })
+        ));
+        assert!(matches!(
+            allowed.identify(&request, None),
+            Err(AppAdmissionError::IdentityMismatch { .. })
+        ), "no peer facts never pass a pin");
+    }
+
+    #[cfg(all(feature = "door-serve", target_os = "linux"))]
+    #[test]
+    fn a_linux_pin_needs_a_live_launch_for_that_app() {
+        use crate::door::declaration::{AppIdentity, IdentityBasis, LinuxLaunch};
+        let mut allowed = pinned(AppIdentity {
+            linux: Some(LinuxLaunch { executable: "/usr/bin/knot".into(), args: vec![] }),
+            ..Default::default()
+        });
+        let (declaration, _) = knotlike();
+        let handle = LaunchHandle::from_bytes([7; 32]);
+        let mut request = declared_request(&declaration, "custody");
+        assert!(matches!(allowed.identify(&request, None), Err(AppAdmissionError::IdentityMismatch { .. })));
+        request.launch = Some(handle);
+        assert!(allowed.identify(&request, None).is_err(), "an unknown handle");
+        allowed.begin_launch(handle, AppId::new("someone-else"));
+        assert!(allowed.identify(&request, None).is_err(), "a handle for another app");
+        allowed.begin_launch(handle, AppId::new("knotlike"));
+        assert_eq!(allowed.identify(&request, None).unwrap(), IdentityBasis::Launched);
+        allowed.end_launch(&handle);
+        assert!(allowed.identify(&request, None).is_err(), "an ended launch");
+    }
+
+    #[test]
+    fn a_windows_image_matches_without_case_or_separator_style() {
+        let pin = crate::door::declaration::WindowsAppIdentity { image: r"C:\Program Files\Knot\knot.exe".into() };
+        assert!(pin.matches(r"c:\program files\knot\KNOT.EXE"));
+        assert!(pin.matches("C:/Program Files/Knot/knot.exe"));
+        assert!(!pin.matches(r"C:\Program Files\Knot\knot-helper.exe"));
+    }
+
+    #[test]
+    fn a_launch_handle_rides_only_the_route_hello_as_hex() {
+        let handle = LaunchHandle::from_bytes([0xab; 32]);
+        let hello = AppHello::for_route(AppId::new("knotlike"), AppRouteId::new("custody").unwrap()).launched(handle);
+        assert_eq!(hello.clone().accept().unwrap().launch, Some(handle));
+        assert!(!format!("{handle:?}").contains("ab"), "a handle never prints");
+        let mut bad = hello.clone();
+        bad.launch = Some("zz".into());
+        assert_eq!(bad.accept().unwrap_err(), AppAdmissionError::InvalidLaunch);
+        let mut legacy = AppHello::new(AppId::new("knotlike"));
+        legacy.launch = Some(handle.to_hex());
+        assert_eq!(legacy.accept().unwrap_err(), AppAdmissionError::DeclarationOnLegacyHello);
+        assert_eq!(LaunchHandle::from_hex(&handle.to_hex()), Some(handle));
     }
 
     #[test]

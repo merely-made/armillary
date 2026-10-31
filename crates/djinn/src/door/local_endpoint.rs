@@ -89,11 +89,11 @@ impl LocalListener {
     }
 
     /// [`Self::serve`], handing each connection with what the OS says about
-    /// its peer. `None` where the OS would not say; Windows connections from
-    /// another user are refused before this.
+    /// its peer, kept for a later signature check. `None` where the OS would
+    /// not say; Windows connections from another user are refused before this.
     pub async fn serve_with_peer<H, F>(self, handle: H) -> Result<(), std::io::Error>
     where
-        H: Fn(Box<dyn LocalStream>, Option<peer_facts::Peer>) -> F + Clone + Send + 'static,
+        H: Fn(Box<dyn LocalStream>, Option<peer_facts::Connected>) -> F + Clone + Send + 'static,
         F: Future<Output = ()> + Send + 'static,
     {
         serve_platform(self, handle).await
@@ -160,7 +160,7 @@ where
 #[cfg(windows)]
 async fn serve_platform<H, F>(listener: LocalListener, handle: H) -> Result<(), std::io::Error>
 where
-    H: Fn(Box<dyn LocalStream>, Option<peer_facts::Peer>) -> F + Clone + Send + 'static,
+    H: Fn(Box<dyn LocalStream>, Option<peer_facts::Connected>) -> F + Clone + Send + 'static,
     F: Future<Output = ()> + Send + 'static,
 {
     use tokio::net::windows::named_pipe::ServerOptions;
@@ -184,7 +184,7 @@ where
                     return;
                 }
             };
-            handle(Box::new(connection), Some(peer)).await;
+            handle(Box::new(connection), Some(peer_facts::Connected::from_peer(peer))).await;
         });
     }
 }
@@ -193,7 +193,7 @@ where
 #[cfg(not(windows))]
 async fn serve_platform<H, F>(listener: LocalListener, handle: H) -> Result<(), std::io::Error>
 where
-    H: Fn(Box<dyn LocalStream>, Option<peer_facts::Peer>) -> F + Clone + Send + 'static,
+    H: Fn(Box<dyn LocalStream>, Option<peer_facts::Connected>) -> F + Clone + Send + 'static,
     F: Future<Output = ()> + Send + 'static,
 {
     use std::os::fd::AsRawFd;
@@ -202,7 +202,7 @@ where
     loop {
         let (connection, _) = listener.accept().await?;
         // The socket's mode already limits it to this user; record who.
-        let peer = peer_facts::unix_peer(connection.as_raw_fd()).ok();
+        let peer = peer_facts::Connected::unix(connection.as_raw_fd()).ok();
         let handle = handle.clone();
         armillary::tasks::spawn_tracked(async move {
             handle(Box::new(connection), peer).await;
@@ -450,7 +450,7 @@ mod unix_tests {
         }));
         let _client = tokio::net::UnixStream::connect(&endpoint).await.expect("connect");
         let peer = received.recv().await.expect("a connection");
-        match peer {
+        match peer.map(|connected| connected.peer) {
             Some(peer_facts::Peer::Unix { uid, pid, .. }) => {
                 assert_eq!(uid, peer_facts::effective_uid());
                 if let Some(pid) = pid {

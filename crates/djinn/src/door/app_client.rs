@@ -127,6 +127,11 @@ impl AppConnection {
         hello: AppHello,
         app: AppId,
     ) -> Result<Self, AppClientError> {
+        // A process Djinn launched carries its handle on every route hello.
+        let hello = match (hello.route.is_some(), crate::door::launch::inherited()) {
+            (true, Some(handle)) => hello.launched(handle),
+            _ => hello,
+        };
         let mut stream = connect_local(endpoint).await?;
         write_native_message_async(&mut stream, &hello).await?;
         let challenge =

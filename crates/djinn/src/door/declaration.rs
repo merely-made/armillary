@@ -248,6 +248,74 @@ pub struct CustodyGrant {
     pub epoch: Vec<NamePattern>,
 }
 
+/// The OS identity an owner pins an application's label to, per platform.
+/// Where none is pinned for the platform the resident runs on, the label is
+/// accepted as stated (development mode), and status says so.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct AppIdentity {
+    /// The code signature a macOS peer must satisfy.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub macos: Option<SignedAppIdentity>,
+    /// The executable a Windows peer must be: the same-user posture of an
+    /// image path, not an OS-held identity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub windows: Option<WindowsAppIdentity>,
+    /// How Djinn launches the application on Linux; a connection is admitted
+    /// under the label only with the handle that launch gave it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub linux: Option<LinuxLaunch>,
+}
+
+/// A macOS code signing team and identifier.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignedAppIdentity {
+    pub team: String,
+    pub identifier: String,
+}
+
+/// A Windows executable, by its full image path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WindowsAppIdentity {
+    pub image: String,
+}
+
+impl WindowsAppIdentity {
+    /// Whether `image` names this executable. Windows paths compare without
+    /// case; separators are normalized.
+    pub fn matches(&self, image: &str) -> bool {
+        let normal = |path: &str| path.replace('/', "\\").to_lowercase();
+        normal(&self.image) == normal(image)
+    }
+}
+
+/// A program Djinn launches for an application, with its arguments.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LinuxLaunch {
+    pub executable: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+}
+
+/// What a connection's label rests on, for status.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "basis", rename_all = "snake_case")]
+pub enum IdentityBasis {
+    /// The label as the application stated it; no identity is pinned for
+    /// this platform.
+    Development,
+    /// A macOS code signature matched the pinned team and identifier.
+    Signed { team: String, identifier: String },
+    /// A Windows peer's executable matched the pinned image: the same-user
+    /// posture of a path, not an OS-held identity.
+    WindowsImage { image: String },
+    /// A Linux connection carried the handle Djinn launched it with.
+    Launched,
+}
+
 /// What the owner lets one declared application have.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -258,6 +326,9 @@ pub struct AppGrant {
     pub routes: Vec<NamePattern>,
     #[serde(default)]
     pub custody: CustodyGrant,
+    /// The OS identity the label is pinned to; absent, development mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<AppIdentity>,
 }
 
 impl AppGrant {
@@ -266,6 +337,7 @@ impl AppGrant {
             app,
             routes: Vec::new(),
             custody: CustodyGrant::default(),
+            identity: None,
         }
     }
 
@@ -412,6 +484,7 @@ mod tests {
                 operations: [CustodyOperation::Status, CustodyOperation::ReleaseEpochKeys, CustodyOperation::Sign].into(),
                 epoch: vec![NamePattern::prefix("app.")],
             },
+            identity: None,
         }
     }
 

@@ -30,3 +30,13 @@ A declared connection receives only what both name; an application the owner
 grants by declaration must declare, and other applications keep label route
 grants. Declarations, like `AppId` labels, are statements within the same-user
 boundary, not executable authentication.
+
+The door records what the OS says about each connection's peer
+(`peer-facts`). An owner's `AppGrant` may pin the label to an OS identity per
+platform: a macOS code signature (team and identifier, checked against the
+peer's audit token), a Windows executable image (the same-user posture of a
+path), or a Linux launch, where Djinn starts the application
+(`door::launch`) with a one-time handle on descriptor 3 that its door client
+carries on every route hello. A pinned label without that identity is
+refused; an unpinned one is admitted as development mode, and
+`AdmittedApp::basis` says which.

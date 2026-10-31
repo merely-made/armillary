@@ -59,6 +59,55 @@ pub struct SignedIdentity {
     pub identifier: String,
 }
 
+/// What the OS said about a peer when it connected, kept so a caller can
+/// check a code signature afterwards against a requirement it learns later
+/// (an owner's grant, say). On macOS this holds the peer's audit token, which
+/// names the process exactly; a pid could be reused.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Connected {
+    pub peer: Peer,
+    #[cfg(target_os = "macos")]
+    audit_token: Option<[u8; 32]>,
+}
+
+impl Connected {
+    /// A peer whose signature cannot be checked later.
+    pub fn from_peer(peer: Peer) -> Self {
+        Self {
+            peer,
+            #[cfg(target_os = "macos")]
+            audit_token: None,
+        }
+    }
+
+    /// The peer of a connected Unix-domain socket, with its audit token on
+    /// macOS.
+    #[cfg(unix)]
+    pub fn unix(fd: std::os::fd::RawFd) -> std::io::Result<Self> {
+        Ok(Self {
+            peer: unix_peer(fd)?,
+            #[cfg(target_os = "macos")]
+            audit_token: macos::audit_token(fd),
+        })
+    }
+
+    /// Whether the peer's code signature satisfies `team` and `identifier`.
+    /// Only macOS can say; elsewhere this is false.
+    pub fn signed_as(&self, team: &str, identifier: &str) -> bool {
+        #[cfg(target_os = "macos")]
+        {
+            self.audit_token
+                .as_ref()
+                .is_some_and(|token| macos::satisfies(token, team, identifier))
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (team, identifier);
+            false
+        }
+    }
+}
+
 /// The first of `candidates` whose signing requirement the macOS peer on
 /// `fd` satisfies, checked against its audit token rather than a pid.
 #[cfg(target_os = "macos")]
@@ -398,6 +447,9 @@ mod tests {
     fn an_unsigned_peer_never_passes_as_a_signed_identity() {
         use std::os::fd::AsRawFd;
         let (a, _b) = std::os::unix::net::UnixStream::pair().unwrap();
+        let connected = Connected::unix(a.as_raw_fd()).unwrap();
+        assert!(!connected.signed_as("ABCDE12345", "com.merely.knot"));
+        assert!(!Connected::from_peer(connected.peer.clone()).signed_as("ABCDE12345", "com.merely.knot"));
         let candidates = [SignedIdentity { team: "ABCDE12345".into(), identifier: "com.merely.djinn.custodian".into() }];
         assert!(signed_peer(a.as_raw_fd(), &candidates).is_none());
         let injected = [SignedIdentity { team: "X\" or anchor apple".into(), identifier: "y".into() }];
