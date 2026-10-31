@@ -356,7 +356,10 @@ mod windows {
     }
 
     /// The peer on the client end of a connected pipe instance: its token
-    /// SID, and its executable where the OS could say so.
+    /// SID, and its executable where the OS could say so. Both are read by the
+    /// client's process id after the pipe connects, so they describe that id
+    /// at the time of the read, not the connection itself; a process id reused
+    /// in between would name another program.
     pub fn pipe_client_peer(handle: HANDLE) -> std::io::Result<Peer> {
         let mut pid = 0u32;
         // SAFETY: valid out-pointer on a connected pipe.

@@ -43,17 +43,9 @@ pub struct AdmittedApp {
     pub authority: Option<AppAuthority>,
 }
 
-/// Snapshot owner grants once for each accepted same-user connection. The
-/// listener tracks children using the surrounding resident task scope.
-pub async fn serve_on<H, F>(listener: LocalListener, grants: AppRouteGrants, handle: H) -> std::io::Result<()>
-where
-    H: Fn(Box<dyn LocalStream>, AllowedAppRoutes) -> F + Clone + Send + Sync + 'static,
-    F: Future<Output = ()> + Send + 'static,
-{
-    serve_on_with_peer(listener, grants, move |stream, allowed, _peer| handle(stream, allowed)).await
-}
-
-/// [`serve_on`], handing each connection with what the OS says about its peer.
+/// Snapshot owner grants once for each accepted same-user connection, and
+/// hand each with what the OS says about its peer. The listener tracks
+/// children using the surrounding resident task scope.
 pub async fn serve_on_with_peer<H, F>(listener: LocalListener, grants: AppRouteGrants, handle: H) -> std::io::Result<()>
 where
     H: Fn(Box<dyn LocalStream>, AllowedAppRoutes, Option<peer_facts::Connected>) -> F + Clone + Send + Sync + 'static,
@@ -64,19 +56,10 @@ where
         .await
 }
 
-/// Resolve the host-owned route and complete the common connect exchange.
-/// A resolver can include current provider leases; it must retain owner denials.
-pub async fn admit<R, Resolve>(reader: &mut R, allowed: &AllowedAppRoutes, resolve: Resolve)
-    -> Result<AdmittedApp, AppServerError>
-where
-    R: AsyncRead + Unpin,
-    Resolve: FnOnce(&AppRequest, &AllowedAppRoutes) -> Result<ResidentEndpointRoute, AppAdmissionError>,
-{
-    admit_from(reader, None, allowed, resolve).await
-}
-
-/// [`admit`], recording what the OS said about the connection's peer and
-/// checking it against an identity the owner pinned the label to.
+/// Resolve the host-owned route, record what the OS said about the
+/// connection's peer and check it against an identity the owner pinned the
+/// label to. A resolver can include current provider leases; it must retain
+/// owner denials.
 pub async fn admit_from<R, Resolve>(
     reader: &mut R,
     connected: Option<peer_facts::Connected>,
@@ -119,7 +102,7 @@ mod tests {
         let host = tokio::spawn(async move {
             let (mut r, mut w) = tokio::io::split(server);
             let grants = AllowedAppRoutes::new([(AppId::new("fixture"), ResidentEndpointRoute::new("custody", Duration::from_millis(50)).unwrap())]);
-            let admitted = admit(&mut r, &grants, |request, grants| grants.admit(request)).await.unwrap();
+            let admitted = admit_from(&mut r, None, &grants, |request, grants| grants.admit(request)).await.unwrap();
             let link = connect(&mut r, &mut w, &admitted.app).await.unwrap().unwrap();
             (admitted, link)
         });

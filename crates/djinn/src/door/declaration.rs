@@ -436,7 +436,9 @@ pub enum IdentityBasis {
     /// A macOS code signature matched the pinned team and identifier.
     Signed { team: String, identifier: String },
     /// A Windows peer's executable matched the pinned image: the same-user
-    /// posture of a path, not an OS-held identity.
+    /// posture of a path, not an OS-held identity. The image was read by the
+    /// peer's process id when it connected, not bound to the connection: a
+    /// process id reused in between would name another program.
     WindowsImage { image: String },
     /// A Linux connection carried the handle Djinn launched it with.
     Launched,

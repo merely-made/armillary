@@ -8,8 +8,10 @@
 //!
 //! Linux has no code signature to read from a peer, so Djinn starts the
 //! application itself and hands it a one-time [`LaunchHandle`] on descriptor
-//! [`LAUNCH_FD`], named by [`LAUNCH_FD_ENV`]. The child's door client reads
-//! it once and carries it on every route hello; the door admits the label
+//! [`LAUNCH_FD`], named by [`LAUNCH_FD_ENV`]. The child calls [`claim`]
+//! first in `main`, which reads it, closes the descriptor and clears the
+//! variable before the child can spawn anything; its door client then carries
+//! it on every route hello; the door admits the label
 //! when the handle is live for that application. It is a secret within the
 //! same-user boundary, like the endpoint itself: it shows a connection came
 //! from the launched process or one it shared the handle with, not more.
@@ -46,6 +48,23 @@ pub fn inherited() -> Option<LaunchHandle> {
 #[cfg(not(unix))]
 pub fn inherited() -> Option<LaunchHandle> {
     None
+}
+
+/// Take the launch handle into this process before anything else runs: read
+/// it, close its descriptor and remove [`LAUNCH_FD_ENV`], so no child this
+/// process spawns inherits either. Call it first in `main`, before spawning
+/// threads or processes; a launched application that waits until its first
+/// route hello leaves the handle open to children started before then.
+/// Returns the handle, which later [`inherited`] calls return too.
+pub fn claim() -> Option<LaunchHandle> {
+    let handle = inherited();
+    #[cfg(unix)]
+    // SAFETY: claim runs first in `main`, before any other thread reads or
+    // writes the environment.
+    unsafe {
+        std::env::remove_var(LAUNCH_FD_ENV);
+    }
+    handle
 }
 
 /// A process Djinn launched, with the handle its connections carry.
@@ -145,6 +164,22 @@ mod tests {
         assert!(grants.current().identify_launch(&handle) == Some(&app));
         end(&grants, &handle);
         assert!(grants.current().identify_launch(&handle).is_none());
+    }
+
+    #[test]
+    fn a_launched_child_that_claims_first_leaves_its_own_children_nothing() {
+        let grants = AppRouteGrants::new(AllowedAppRoutes::none());
+        // What claim does in a launched process: read the handle, then a
+        // grandchild finds neither the variable nor an open descriptor 3.
+        let script = format!(
+            "od -An -tx1 <&{LAUNCH_FD} >/dev/null; exec {LAUNCH_FD}<&-; unset {LAUNCH_FD_ENV}; \
+             sh -c 'test -z \"${LAUNCH_FD_ENV}\" && ! od -An -tx1 <&{LAUNCH_FD} 2>/dev/null && echo clean'"
+        );
+        let mut command = std::process::Command::new("/bin/sh");
+        command.args(["-c", &script]).stdout(std::process::Stdio::piped());
+        let launched = launch_command(&grants, &AppId::new("claiming-app"), command).unwrap();
+        let output = launched.child.wait_with_output().unwrap();
+        assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "clean");
     }
 
     #[test]

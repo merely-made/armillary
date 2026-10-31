@@ -38,8 +38,11 @@ The door records what the OS says about each connection's peer
 (`peer-facts`). An owner's `AppGrant` may pin the label to an OS identity per
 platform: a macOS code signature (team and identifier, checked against the
 peer's audit token), a Windows executable image (the same-user posture of a
-path), or a Linux launch, where Djinn starts the application
-(`door::launch`) with a one-time handle on descriptor 3 that its door client
-carries on every route hello. A pinned label without that identity is
+path, read by process id at connect rather than bound to the connection), or
+a Linux launch, where Djinn starts the application (`door::launch`) with a
+one-time handle on descriptor 3. The application calls `launch::claim()`
+first in `main`, which reads the handle, closes the descriptor and clears its
+variable before anything is spawned; its door client carries the handle on
+every route hello. A pinned label without that identity is
 refused; an unpinned one is admitted as development mode, and
 `AdmittedApp::basis` says which.
