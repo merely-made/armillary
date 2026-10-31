@@ -45,9 +45,9 @@ command that caused them without defining the outcome vocabulary.
 ## Next
 
 - `design_docs/armillary_docs/research/2026-07-07_armillary_founding_proposal.md`
-- Consumers in this workspace: `crates/system/fetch`, `crates/fleece` (`crawl` feature),
-  pictograph's `canvas` feature (`crates/canvas/pictograph`), and
-  `crates/intel/esp` under its `actor` feature.
+- Consumers: Mere's `crates/system/fetch`, `crates/fleece` (`crawl` feature)
+  and pictograph's `canvas` feature (`crates/canvas/pictograph`), and ESP
+  ([merely-made/esp](https://github.com/merely-made/esp)) under its `actor` feature.
 
 License: MPL-2.0 (see LICENSE).
 
