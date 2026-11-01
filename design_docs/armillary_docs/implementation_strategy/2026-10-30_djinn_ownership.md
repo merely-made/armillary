@@ -15,7 +15,7 @@
 ## Global constraints
 
 - Preserve provider-offer delivery and its policy, lease generations, work ordering, cancellation and disconnect behavior. Publish that baseline first; new supplier edits are isolated.
-- One `djinn` package in Armillary; Mere package becomes `mere-resident` at its existing path with executable names unchanged. No extra client/broker crates.
+- One `djinn` package in Armillary (amended 2026-10-31 by the [Djinn slimming plan](2026-10-31_djinn_slimming_plan.md) D2 and D3: a door contract crate beside Djinn and a custody crate in Dramatis); Mere package becomes `mere-resident` at its existing path with executable names unchanged. No extra client/broker crates.
 - Default features empty. Portable `door`; native `door-native`, `door-serve`, `custody`, `custody-client`; native `resident` enables Armillary lifecycle/task orchestration. No Chirograph/scenes/Mere/Knot/Distillery dependencies in independent Djinn.
 - Identity domain types stay Dramatis/Personae. Remove convenience identity re-export and migrate every live receiver directly to `dramatis::view`.
 - Same endpoint/env/schema strings, native-endian 1 MiB framing, safe JSON category/line/column errors, guarded owned buffers, session/nonces/request IDs, locked custody, host grants and mandatory projection validators.

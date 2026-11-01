@@ -17,3 +17,4 @@ records the shared command gate, last-sender/inbox ownership and its qualificati
 Product resource initialization uses standard `LazyLock`; policy stays with hosts.
 
 - [Djinn ownership extraction](armillary_docs/implementation_strategy/2026-10-30_djinn_ownership.md): independent application door and resident lifetimes, immediate receiver migration and qualification.
+- [Djinn slimming](armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md): the custody half leaves for Dramatis and a door contract crate leaves for producers, so Djinn keeps the serving half; waits for capability-door I1.
