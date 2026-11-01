@@ -1,9 +1,9 @@
 # Djinn slimming plan
 
-**Status:** 2026-11-01, plan; names chosen (D5, D6). No code moves until capability-door I1 is recorded as
-landed (D4); the cut is then made against that tip. Measured against Armillary
-`104b8d4`, Mere `5431b896c` and Dramatis `2d9ddc0`; no build was run for these
-findings.
+**Status:** 2026-11-01, S0 done; S2 next. Capability-door I1 is recorded as
+landed (D4), and the findings are re-measured against it (Armillary
+`019d1e5`, Djinn's sources unchanged since `104b8d4`; Mere `23bb596e2`). F1
+and F3 answered (D8, D9). No build was run for these findings.
 
 **For:** Mere's distillery extraction D18 ("Publish the djinn chain, but also,
 aren't we supposed to be moving those services so djinn isn't a god crate and
@@ -88,17 +88,69 @@ runner.
 
   Links: summary ostiary and castellan-client are claimed by S5's real publish, not by stubs.
 
+- **D8. The socket fallback is inlined and pinned (Mark, 2026-11-01):**
+  "Inline + pin (Recommended)", over keeping a native `personae` dependency or
+  giving the door its own directory. Off Windows, without `XDG_RUNTIME_DIR`,
+  the endpoint is `personae::default_vault_dir()` joined with
+  `graphshell-app.sock`: `$XDG_DATA_HOME` or `~/.local/share`, then
+  `personae/vault`. macOS never sets `XDG_RUNTIME_DIR`, so that is the macOS
+  default. Ostiary copies the derivation, and a test pins the path, so no
+  installed client or resident moves and the contract never reaches Dramatis.
+
+  Links: closes djinn-slimming F1 · summary ostiary inlines the vault-directory socket fallback with a test pinning its path; no personae dependency.
+
+- **D9. Ostiary reserves the byte path W1 needs (Mark, 2026-11-01):**
+  "Reserve byte path now (Recommended)", over moving the JSON wire unchanged
+  and letting W1 change ostiary later, or doing W1's door step first.
+  Capability-door D21 and W1 (Mere `23bb596e2`) move the projection
+  session's door path onto the generated WIT calls as it is next touched, and
+  after the hello today's door speaks only JSON frames. In S2 ostiary hands
+  out the admitted stream after the hello, so W1 binds script-wire's
+  transport to it in `graphshell-endpoint`. Ostiary never depends on
+  script-wire. Custody, MCP and overmap stay on the JSON wire, which W1 does
+  not cover.
+
+  Links: draws on mere:capability-door D21, W1 · closes djinn-slimming F3 · summary ostiary exposes the admitted stream after the hello so W1 can carry the WIT calls over the door; script-wire stays above it.
+
 ## Open forks
 
-- **F1. The socket-path fallback.** `default_app_endpoint` falls back to
-  `personae::default_vault_dir()` when `XDG_RUNTIME_DIR` is unset
-  (`door/app_admission.rs:769`). That is the door's only `personae` use
-  outside tests and custody. The contract can inline the same ten-line
-  derivation, with a test pinning the resulting path, or keep a `personae`
-  dependency on native targets. Put this to Mark at S2's start.
-- **F2.** Closed by D5 to D7.
+None. F1 was closed by D8, F2 by D5 to D7 and F3 by D9.
 
 ## Findings
+
+2026-11-01 (S0), against Armillary `019d1e5` and Mere `23bb596e2`:
+
+- **Djinn is unchanged since `104b8d4`.** The sizes below hold (8,039 lines);
+  the local manifest reads 0.0.3, and crates.io has 0.0.2.
+- **What I1 added, by side of the seam:**
+  - `launch.rs` splits. `LAUNCH_FD_ENV`, `LAUNCH_FD`, `inherited()` and
+    `claim()` (lines 25-76, std only) are the launched child's side, and
+    `app_client` calls `inherited()` on every route hello: contract.
+    `Launched`, `launch`, `launch_command`, `end` and `end_process`
+    (`door-serve`, `libc`, `peer-facts`) stay in Djinn.
+  - `LaunchHandle` and the hello's `launched` field, with
+    `AppAdmissionError::InvalidLaunch`: contract.
+  - `declaration.rs` gained `AppIdentity`, `SignedAppIdentity`,
+    `WindowsAppIdentity`, `LinuxLaunch`, `IdentityBasis`, `AppGrant` and
+    `AppAuthority`. None uses `peer-facts`, so the whole file stays in the
+    contract as grant vocabulary.
+  - `AllowedAppRoutes::identify`, `begin_process` and `end_process` take
+    `peer_facts` types: Djinn, with the rest of the grant logic.
+  - `local_endpoint`'s listener and `server` now hand `peer_facts::Connected`:
+    Djinn. The dialer is still free of peer facts.
+- **The new `wit` feature does not touch the door.** `graphshell-endpoint`'s
+  `src/wit` names no `djinn` path. Its door carrier (`src/door/projection.rs`)
+  is the one W1 moves, which D9 makes room for.
+- **Consumers the table missed:** isocosm's `isocosm-genet` (`custody-client`,
+  `CustodyIdentity::connect_as`, pinned to Armillary `7eebeeb`), and
+  Armillary's own `support/fixtures/djinn` (`portable`, `native`, `custody`,
+  `custody-types`, `resident`, and `check.sh`). Both are added to the table.
+- **crates.io, 2026-11-01:** `ostiary`, `castellan-client`, `peer-facts`,
+  `script-wire` and `script-witgen` are free. `chirograph` is at 0.0.3, and
+  its source has changed since then (capability-door D20). `sceno` is at
+  0.0.7. Because `graphshell-endpoint`'s optional `wit` dependencies must be
+  published too, the D17 chain gains `script-wire` and `script-witgen` and
+  needs a fresh `chirograph`.
 
 2026-10-31, against Armillary `104b8d4`:
 
@@ -154,6 +206,8 @@ runner.
   | `support/fixtures/custody-projection` (6 crates) | per feature | per feature |
   | Knot (`knot-editor`) | admission, `declaration`, `wire`, `frame`, `custody`, `custody_client` | both |
   | Cleromancy | admission types | contract |
+  | isocosm `isocosm-genet` | `custody_identity` | custody crate |
+  | Armillary `support/fixtures/djinn` (5 crates) | per feature | per feature |
 
 - **C0 is a layer above.** Capability door D13 and D14 (Mere `39a3a8afd`)
   put the projection session's WIT interface in `mere:script`, probed under
@@ -168,6 +222,8 @@ runner.
 ## Phases
 
 ### S0. The tip after I1
+
+Done 2026-11-01: see the first findings entry.
 
 I1 was built on 2026-10-30 (Armillary `b6578ee`). Its Windows remainder
 (capability door D11) was landing on 2026-10-31 (`7eebeeb`, `104b8d4`).
@@ -188,13 +244,16 @@ Chosen and recorded in the naming ledger: `ostiary` (D5) and
 ### S2. The door contract crate (Armillary)
 
 The contract crate is a new Armillary workspace member. It holds `wire`,
-`frame`, `route`, `declaration`, the admission types, `app_client` and the
-dialer, with the same endpoint, environment and schema strings and the same
-1 MiB native-endian framing. Djinn depends on it and keeps `server`, `link`,
-`launch`, the grant logic, the listener and `resident`.
+`frame`, `route`, `declaration`, the admission types, `app_client`, the
+dialer and the launched child's side of `launch` (`inherited`, `claim`), with
+the same endpoint, environment and schema strings and the same 1 MiB
+native-endian framing. Djinn depends on it and keeps `server`, `link`, the
+launcher, the grant logic, the listener and `resident`.
 
 - Done when:
-  - F1 is answered;
+  - the socket fallback is inlined, with a test pinning its path (D8);
+  - an admitted connection can hand out its stream after the hello, with a
+    test that carries raw bytes over it (D9);
   - the contract's portable tier builds for `wasm32-unknown-unknown`, and its
     dependency tree holds serde, serde_json, thiserror and zeroize, plus
     tokio, base64 and rand_core on native, and nothing from Dramatis,
@@ -240,10 +299,13 @@ the custody crate; its projection features depend on the contract.
     drift check), `peer-facts` and Djinn, each name rechecked just before
     its upload (D7);
   - `mere:distillery-extraction` D17 resumes: `graphshell-endpoint` 0.0.3
-    and the six crates behind it are published;
+    and the crates behind it are published, now including `script-wire`,
+    `script-witgen` and a `chirograph` bump past 0.0.3 (S0 findings);
   - `mere:distillery-extraction` F4 is closed, citing this plan.
 
 ## Progress
 
 - 2026-10-31: plan written; D1 to D4 answered.
 - 2026-11-01: naming round, D5 to D7; F2 closed.
+- 2026-11-01: S0 done. I1's additions placed, two missed consumers added,
+  both names still free (S1); D8 and D9 answered, closing F1 and F3.
