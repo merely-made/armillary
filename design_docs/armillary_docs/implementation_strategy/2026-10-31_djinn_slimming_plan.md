@@ -1,6 +1,6 @@
 # Djinn slimming plan
 
-**Status:** 2026-10-31, plan. No code moves until capability-door I1 is recorded as
+**Status:** 2026-11-01, plan; names chosen (D5, D6). No code moves until capability-door I1 is recorded as
 landed (D4); the cut is then made against that tip. Measured against Armillary
 `104b8d4`, Mere `5431b896c` and Dramatis `2d9ddc0`; no build was run for these
 findings.
@@ -61,6 +61,33 @@ runner.
 
   Links: summary Execution waits for capability-door I1 to land; the plan is written now.
 
+- **D5. The door contract crate is `ostiary` (Mark, 2026-11-01):** "ostiary",
+  over `djinn-door` (recommended), `djinn-wire` and `doorward`. The ostiary is
+  the doorkeeper, a minor order. Its lean toward the serving side, which
+  stays in Djinn, and its obscurity were stated when it was offered. On
+  2026-11-01 crates.io had it free; postern, wicket, lintel, threshold and
+  porter were taken.
+
+  Links: plans djinn-slimming D3 · summary The door contract crate is named ostiary.
+
+- **D6. The custody crate is `castellan-client` (Mark, 2026-11-01):** Asked
+  for a name, Mark wrote "Why don't we repurpose castellan? If it is no longer
+  necessary…". It is still necessary: Castellan is the custody authority
+  (27,573 lines: the vault, the unlock ladder, the SSH agent, wallet seeds),
+  linked only by Djinn's custodian, and `castellan` 0.0.3 on crates.io is
+  ours. Put back with that finding, he chose "castellan-client
+  (Recommended)", over `suppliant`, `claviger` and `petitioner`. The client is
+  the app's side of Castellan's "gate petition". It lives in Dramatis, and
+  Castellan stays in Mere (Dramatis D6).
+
+  Links: plans djinn-slimming D2 · summary The custody client crate is named castellan-client, the petitioning side of Castellan.
+
+- **D7. Claim the names by publishing real code (Mark, 2026-11-01):** "Real
+  publish at S5", over 0.0.1 reservation stubs now. Both names stay exposed
+  until S5 (the ledger's heddle risk, stated when offered).
+
+  Links: summary ostiary and castellan-client are claimed by S5's real publish, not by stubs.
+
 ## Open forks
 
 - **F1. The socket-path fallback.** `default_app_endpoint` falls back to
@@ -69,8 +96,7 @@ runner.
   outside tests and custody. The contract can inline the same ten-line
   derivation, with a test pinning the resulting path, or keep a `personae`
   dependency on native targets. Put this to Mark at S2's start.
-- **F2. Names.** The door contract crate and the Dramatis custody crate,
-  through the naming ledger, claimed with a real publish (S1).
+- **F2.** Closed by D5 to D7.
 
 ## Findings
 
@@ -153,9 +179,11 @@ I1 was built on 2026-10-30 (Armillary `b6578ee`). Its Windows remainder
 
 ### S1. Names
 
-- Done when: Mark has chosen both crate names in a naming round, they are
-  recorded in the naming ledger, and both are claimed on crates.io with a real
-  publish.
+Chosen and recorded in the naming ledger: `ostiary` (D5) and
+`castellan-client` (D6). They are claimed in S5 (D7).
+
+- Done when: both names are still free when S2 starts. If either has been
+  taken, it goes back to Mark before any code is named.
 
 ### S2. The door contract crate (Armillary)
 
@@ -208,8 +236,9 @@ the custody crate; its projection features depend on the contract.
 ### S5. Publish and resume
 
 - Done when:
-  - published, in order: the contract, the custody crate (after the Dramatis
-    drift check), `peer-facts` and Djinn;
+  - published, in order: `ostiary`, `castellan-client` (after the Dramatis
+    drift check), `peer-facts` and Djinn, each name rechecked just before
+    its upload (D7);
   - `mere:distillery-extraction` D17 resumes: `graphshell-endpoint` 0.0.3
     and the six crates behind it are published;
   - `mere:distillery-extraction` F4 is closed, citing this plan.
@@ -217,3 +246,4 @@ the custody crate; its projection features depend on the contract.
 ## Progress
 
 - 2026-10-31: plan written; D1 to D4 answered.
+- 2026-11-01: naming round, D5 to D7; F2 closed.
