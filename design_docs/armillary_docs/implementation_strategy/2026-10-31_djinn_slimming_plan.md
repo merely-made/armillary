@@ -155,6 +155,13 @@ runner.
   | Knot (`knot-editor`) | admission, `declaration`, `wire`, `frame`, `custody`, `custody_client` | both |
   | Cleromancy | admission types | contract |
 
+- **Channel routes (2026-11-01).** `door/channel.rs` came in after these
+  measurements, for Mere's device-pairing D11 (SSH by key): a route whose
+  session, after one opening `Call` and its `ChannelOpened` answer, carries
+  raw bytes, the host proxying them (capability door N1's proxied channel).
+  On the seam: `ChannelOpened` and `AppConnection::open_channel` are
+  contract; `read_channel_open`, `answer_channel_open` and
+  `refuse_channel_open` serve, beside `server`, in Djinn.
 - **C0 is a layer above.** Capability door D13 and D14 (Mere `39a3a8afd`)
   put the projection session's WIT interface in `mere:script`, probed under
   Mere's `crates/probes/projection-session-c0/`. The door contract here

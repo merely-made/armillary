@@ -183,6 +183,12 @@ impl AppConnection {
         })
     }
 
+    /// The session's stream, for a route whose session leaves framing (a
+    /// channel route, `super::channel`).
+    pub(super) fn into_stream(self) -> Box<dyn LocalStream> {
+        self.stream
+    }
+
     /// The session id the host admitted.
     pub fn session(&self) -> &str {
         &self.session

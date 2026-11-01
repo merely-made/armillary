@@ -7,6 +7,7 @@
 //! Application admission, framing, native connections and custody clients.
 
 pub mod app_admission;
+pub mod channel;
 #[cfg(all(
     feature = "door-native",
     any(unix, windows),
