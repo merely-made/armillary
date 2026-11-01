@@ -15,6 +15,12 @@
 //! when the handle is live for that application. It is a secret within the
 //! same-user boundary, like the endpoint itself: it shows a connection came
 //! from the launched process or one it shared the handle with, not more.
+//!
+//! Windows needs no secret (capability door plan, D11). Djinn holds the
+//! launched process's handle, so its id names no other process until Djinn
+//! lets go, and the door admits the label when the pipe recorded that
+//! process, by id and creation time. Its children are not the application,
+//! as on Linux.
 
 use crate::door::app_admission::LaunchHandle;
 
@@ -44,7 +50,8 @@ pub fn inherited() -> Option<LaunchHandle> {
     })
 }
 
-/// The handle this process was launched with; never on this platform.
+/// The handle this process was launched with; never on this platform, where
+/// the door knows a launched process by the pipe.
 #[cfg(not(unix))]
 pub fn inherited() -> Option<LaunchHandle> {
     None
@@ -144,6 +151,60 @@ pub fn end(grants: &crate::door::app_admission::AppRouteGrants, handle: &LaunchH
     grants.update(|routes| routes.end_launch(handle));
 }
 
+/// A process Djinn launched on Windows. `child` holds the process's handle,
+/// which keeps its id from naming another process; drop it only after
+/// [`end_process`].
+#[cfg(all(feature = "door-serve", windows))]
+pub struct Launched {
+    pub child: std::process::Child,
+    pub process: peer_facts::ProcessKey,
+}
+
+/// Start `program` with `args` as `app`, accepting the process's own
+/// connections as `app` until [`end_process`] is called; a caller ends it
+/// when the child exits. The process is registered just after it starts, so
+/// it should connect after it has started: a connection racing its creation
+/// is refused, not mistaken.
+#[cfg(all(feature = "door-serve", windows))]
+pub fn launch(
+    grants: &crate::door::app_admission::AppRouteGrants,
+    app: &crate::door::app_admission::AppId,
+    program: &str,
+    args: &[String],
+) -> std::io::Result<Launched> {
+    let mut command = std::process::Command::new(program);
+    command.args(args);
+    launch_command(grants, app, command)
+}
+
+/// [`launch`] for a command the caller has configured (its stdio, say).
+#[cfg(all(feature = "door-serve", windows))]
+pub fn launch_command(
+    grants: &crate::door::app_admission::AppRouteGrants,
+    app: &crate::door::app_admission::AppId,
+    mut command: std::process::Command,
+) -> std::io::Result<Launched> {
+    use std::os::windows::io::AsRawHandle;
+
+    let mut child = command.spawn()?;
+    let process = match peer_facts::process_key(child.as_raw_handle() as _, child.id()) {
+        Ok(process) => process,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error);
+        }
+    };
+    grants.update(|routes| routes.begin_process(process, app.clone()));
+    Ok(Launched { child, process })
+}
+
+/// Stop accepting connections from `process`: it exited.
+#[cfg(feature = "door-serve")]
+pub fn end_process(grants: &crate::door::app_admission::AppRouteGrants, process: &peer_facts::ProcessKey) {
+    grants.update(|routes| routes.end_process(process));
+}
+
 #[cfg(all(test, feature = "door-serve", unix))]
 mod tests {
     use super::*;
@@ -187,5 +248,33 @@ mod tests {
         let grants = AppRouteGrants::new(AllowedAppRoutes::none());
         assert!(launch(&grants, &AppId::new("missing"), "/nonexistent/djinn-test", &[]).is_err());
         assert!(grants.current().launch_count() == 0);
+    }
+}
+
+#[cfg(all(test, feature = "door-serve", windows))]
+mod windows_tests {
+    use super::*;
+    use crate::door::app_admission::{AllowedAppRoutes, AppId, AppRouteGrants};
+
+    #[test]
+    fn a_launched_process_is_known_by_id_and_creation_time_until_it_ends() {
+        let grants = AppRouteGrants::new(AllowedAppRoutes::none());
+        let mut command = std::process::Command::new("cmd.exe");
+        command.args(["/c", "exit 0"]);
+        let launched = launch_command(&grants, &AppId::new("launched-app"), command).unwrap();
+        let Launched { mut child, process } = launched;
+        assert_eq!(process.pid, child.id());
+        assert!(process.created > 0);
+        assert_eq!(grants.current().launch_count(), 1);
+        assert!(child.wait().unwrap().success());
+        end_process(&grants, &process);
+        assert_eq!(grants.current().launch_count(), 0);
+    }
+
+    #[test]
+    fn a_failed_launch_leaves_no_live_process() {
+        let grants = AppRouteGrants::new(AllowedAppRoutes::none());
+        assert!(launch(&grants, &AppId::new("missing"), r"C:\nonexistent\djinn-test.exe", &[]).is_err());
+        assert_eq!(grants.current().launch_count(), 0);
     }
 }

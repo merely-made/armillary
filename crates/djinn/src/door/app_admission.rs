@@ -381,6 +381,9 @@ pub struct AllowedAppRoutes {
     served: BTreeMap<AppRouteId, ResidentEndpointRoute>,
     /// Live launch handles, each naming the application Djinn launched with it.
     launches: BTreeMap<LaunchHandle, AppId>,
+    /// Live launched Windows processes, each naming its application.
+    #[cfg(feature = "door-serve")]
+    processes: BTreeMap<peer_facts::ProcessKey, AppId>,
 }
 
 impl Default for AllowedAppRoutes {
@@ -434,6 +437,8 @@ impl AllowedAppRoutes {
             grants: BTreeMap::new(),
             served: BTreeMap::new(),
             launches: BTreeMap::new(),
+            #[cfg(feature = "door-serve")]
+            processes: BTreeMap::new(),
         }
     }
 
@@ -532,9 +537,27 @@ impl AllowedAppRoutes {
         self.launches.get(handle)
     }
 
-    /// How many launch handles are live.
+    /// Accept connections from `process` as `app`'s launch, until
+    /// [`Self::end_process`]. Djinn holds the process's handle meanwhile, so
+    /// its id names no other process.
+    #[cfg(feature = "door-serve")]
+    pub fn begin_process(&mut self, process: peer_facts::ProcessKey, app: AppId) {
+        self.processes.insert(process, app);
+    }
+
+    /// Stop accepting `process`: it exited.
+    #[cfg(feature = "door-serve")]
+    pub fn end_process(&mut self, process: &peer_facts::ProcessKey) {
+        self.processes.remove(process);
+    }
+
+    /// How many launches are live: handles, and launched Windows processes.
     pub fn launch_count(&self) -> usize {
-        self.launches.len()
+        #[cfg(feature = "door-serve")]
+        let processes = self.processes.len();
+        #[cfg(not(feature = "door-serve"))]
+        let processes = 0;
+        self.launches.len() + processes
     }
 
     /// What `request`'s label rests on, given what the OS said about the
@@ -566,13 +589,19 @@ impl AllowedAppRoutes {
         }
         if cfg!(windows) {
             if let Some(windows) = &pinned.windows {
+                let launched = connected
+                    .and_then(|c| c.process())
+                    .and_then(|process| self.processes.get(&process));
+                if launched == Some(&request.app) {
+                    return Ok(IdentityBasis::Launched);
+                }
                 let image = connected.and_then(|c| match &c.peer {
                     peer_facts::Peer::Windows { image, .. } => image.clone(),
                     _ => None,
                 });
                 return match image.filter(|image| windows.matches(image)) {
                     Some(image) => Ok(IdentityBasis::WindowsImage { image }),
-                    None => Err(mismatch(format!("the executable {}", windows.image))),
+                    None => Err(mismatch(format!("the executable {} or a process Djinn launched", windows.image))),
                 };
             }
         }
@@ -1057,6 +1086,44 @@ mod tests {
         assert_eq!(allowed.identify(&request, None).unwrap(), IdentityBasis::Launched);
         allowed.end_launch(&handle);
         assert!(allowed.identify(&request, None).is_err(), "an ended launch");
+    }
+
+    #[cfg(all(feature = "door-serve", windows))]
+    #[tokio::test]
+    async fn a_windows_pin_admits_the_launched_process_and_otherwise_its_image() {
+        use crate::door::declaration::{AppIdentity, IdentityBasis, WindowsAppIdentity};
+        use std::os::windows::io::AsRawHandle;
+        use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
+
+        let endpoint = format!(r"\\.\pipe\djinn-launch-pin-{}", uuid::Uuid::new_v4());
+        let server = ServerOptions::new().first_pipe_instance(true).create(&endpoint).unwrap();
+        let _client = ClientOptions::new().open(&endpoint).unwrap();
+        server.connect().await.unwrap();
+        let connected = peer_facts::Connected::pipe_client(server.as_raw_handle() as _, peer_facts::system_time()).unwrap();
+        let process = connected.process().unwrap();
+        let (declaration, _) = knotlike();
+        let request = declared_request(&declaration, "custody");
+
+        let mut allowed = pinned(AppIdentity {
+            windows: Some(WindowsAppIdentity { image: r"C:\Knot\knot.exe".into() }),
+            ..Default::default()
+        });
+        let refused = |allowed: &AllowedAppRoutes| matches!(allowed.identify(&request, Some(&connected)), Err(AppAdmissionError::IdentityMismatch { .. }));
+        assert!(refused(&allowed), "neither launched nor the pinned image");
+        allowed.begin_process(process, AppId::new("someone-else"));
+        assert!(refused(&allowed), "launched for another application");
+        allowed.begin_process(process, AppId::new("knotlike"));
+        assert_eq!(allowed.identify(&request, Some(&connected)).unwrap(), IdentityBasis::Launched);
+        let mut another = process;
+        another.created += 1;
+        allowed.end_process(&process);
+        allowed.begin_process(another, AppId::new("knotlike"));
+        assert!(refused(&allowed), "the same id with another creation time is another process");
+
+        let exe = std::env::current_exe().unwrap().to_string_lossy().into_owned();
+        let by_image = pinned(AppIdentity { windows: Some(WindowsAppIdentity { image: exe }), ..Default::default() });
+        assert!(matches!(by_image.identify(&request, Some(&connected)), Ok(IdentityBasis::WindowsImage { .. })));
+        assert!(matches!(by_image.identify(&request, None), Err(AppAdmissionError::IdentityMismatch { .. })), "no peer facts never pass a pin");
     }
 
     #[test]

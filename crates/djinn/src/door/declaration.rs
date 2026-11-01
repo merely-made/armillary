@@ -383,8 +383,9 @@ pub struct AppIdentity {
     /// The code signature a macOS peer must satisfy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub macos: Option<SignedAppIdentity>,
-    /// The executable a Windows peer must be: the same-user posture of an
-    /// image path, not an OS-held identity.
+    /// The executable a Windows peer must be: the process Djinn launched from
+    /// it, or else the same-user posture of an image path, not an OS-held
+    /// identity.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub windows: Option<WindowsAppIdentity>,
     /// How Djinn launches the application on Linux; a connection is admitted
@@ -401,7 +402,8 @@ pub struct SignedAppIdentity {
     pub identifier: String,
 }
 
-/// A Windows executable, by its full image path.
+/// A Windows executable, by its full image path: the program Djinn launches
+/// for the application, and the image a connection it did not launch must be.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WindowsAppIdentity {
@@ -436,11 +438,13 @@ pub enum IdentityBasis {
     /// A macOS code signature matched the pinned team and identifier.
     Signed { team: String, identifier: String },
     /// A Windows peer's executable matched the pinned image: the same-user
-    /// posture of a path, not an OS-held identity. The image was read by the
-    /// peer's process id when it connected, not bound to the connection: a
-    /// process id reused in between would name another program.
+    /// posture of a path, not an OS-held identity. The image was read when
+    /// the door saw the connect, from one handle to the process the pipe
+    /// recorded, which was refused had it been created after the connect.
     WindowsImage { image: String },
-    /// A Linux connection carried the handle Djinn launched it with.
+    /// A process Djinn launched for the application: on Linux the connection
+    /// carried the launch's handle; on Windows the pipe recorded the launched
+    /// process itself, by id and creation time, while Djinn held its handle.
     Launched,
 }
 

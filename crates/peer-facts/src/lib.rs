@@ -6,9 +6,9 @@
 
 //! Who is on the other end of a local connection, as the OS says so:
 //! `SO_PEERCRED` on Linux, `getpeereid` (and `LOCAL_PEERPID`) on macOS and
-//! the BSDs, the pipe client's token SID and image on Windows, and a signed
-//! code identity where a macOS peer's audit token satisfies a signing
-//! requirement.
+//! the BSDs, a Windows pipe client's token read through the pipe and its
+//! process read from one handle, and a signed code identity where a macOS
+//! peer's audit token satisfies a signing requirement.
 //!
 //! These are facts, not policy. Djinn's application door records them for
 //! each connection; custody-wire's custodian selects a principal by them and
@@ -59,15 +59,51 @@ pub struct SignedIdentity {
     pub identifier: String,
 }
 
+/// One Windows process: its id and creation time. An id is reused once its
+/// process ends and its last handle closes; the pair is not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ProcessKey {
+    pub pid: u32,
+    /// Creation time, in 100-nanosecond intervals since 1601 (a `FILETIME`).
+    pub created: u64,
+}
+
+/// What a Windows pipe client's token says, read through the pipe rather
+/// than by process id.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PipeToken {
+    /// The token user's SID.
+    pub user: String,
+    /// The Remote Desktop session the client runs in.
+    pub session: u32,
+    /// The mandatory integrity level's RID: [`PipeToken::MEDIUM`] for an
+    /// ordinary desktop process, lower for a sandboxed one.
+    pub integrity: u32,
+    /// The AppContainer's SID, for a client running in one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_container: Option<String>,
+}
+
+impl PipeToken {
+    /// `SECURITY_MANDATORY_MEDIUM_RID`.
+    pub const MEDIUM: u32 = 0x2000;
+}
+
 /// What the OS said about a peer when it connected, kept so a caller can
 /// check a code signature afterwards against a requirement it learns later
 /// (an owner's grant, say). On macOS this holds the peer's audit token, which
-/// names the process exactly; a pid could be reused.
+/// names the process exactly; a pid could be reused. On Windows it holds the
+/// client's token, read through the pipe, and the process the pipe recorded.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Connected {
     pub peer: Peer,
     #[cfg(target_os = "macos")]
     audit_token: Option<[u8; 32]>,
+    #[cfg(windows)]
+    process: Option<ProcessKey>,
+    #[cfg(windows)]
+    token: Option<PipeToken>,
 }
 
 impl Connected {
@@ -77,6 +113,54 @@ impl Connected {
             peer,
             #[cfg(target_os = "macos")]
             audit_token: None,
+            #[cfg(windows)]
+            process: None,
+            #[cfg(windows)]
+            token: None,
+        }
+    }
+
+    /// The client of a connected pipe instance, read for a connect the server
+    /// saw complete at `connected_at` (from [`system_time`], taken as soon as
+    /// the connect returned). Its token is read through the pipe; its
+    /// process id, creation time and image come from one handle to the
+    /// process the pipe recorded, refused if that process was created after
+    /// `connected_at`, when its id must have been reused. Within the
+    /// granularity of process creation times, a process id cannot then name
+    /// another program. The peer's SID is the token's.
+    #[cfg(windows)]
+    pub fn pipe_client(handle: windows::HANDLE, connected_at: u64) -> std::io::Result<Self> {
+        let (process, image) = windows::pipe_client_process(handle, connected_at)?;
+        let token = windows::pipe_token(handle)?;
+        Ok(Self {
+            peer: Peer::Windows { sid: token.user.clone(), pid: process.pid, image },
+            process: Some(process),
+            token: Some(token),
+        })
+    }
+
+    /// A Windows client's token, where it was read through the pipe.
+    pub fn token(&self) -> Option<&PipeToken> {
+        #[cfg(windows)]
+        {
+            self.token.as_ref()
+        }
+        #[cfg(not(windows))]
+        {
+            None
+        }
+    }
+
+    /// The Windows process the pipe recorded, where it was read for the
+    /// connect.
+    pub fn process(&self) -> Option<ProcessKey> {
+        #[cfg(windows)]
+        {
+            self.process
+        }
+        #[cfg(not(windows))]
+        {
+            None
         }
     }
 
@@ -266,17 +350,25 @@ pub fn effective_uid() -> u32 {
 }
 
 #[cfg(windows)]
-pub use windows::{current_user_sid, pipe_client_peer, pipe_server_peer, process_image, service_sid};
+pub use windows::{current_user_sid, pipe_client_peer, pipe_server_peer, process_image, process_key, service_sid, system_time};
 
 #[cfg(windows)]
 mod windows {
-    use windows_sys::Win32::Foundation::{CloseHandle, ERROR_INSUFFICIENT_BUFFER, HANDLE, INVALID_HANDLE_VALUE, LocalFree};
+    use windows_sys::Win32::Foundation::{CloseHandle, ERROR_INSUFFICIENT_BUFFER, FILETIME, INVALID_HANDLE_VALUE, LocalFree};
     use windows_sys::Win32::Security::Authorization::ConvertSidToStringSidW;
-    use windows_sys::Win32::Security::{GetTokenInformation, LookupAccountNameW, PSID, SID_NAME_USE, TOKEN_QUERY, TOKEN_USER, TokenUser};
-    use windows_sys::Win32::System::Pipes::{GetNamedPipeClientProcessId, GetNamedPipeServerProcessId};
-    use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW};
+    use windows_sys::Win32::Security::{
+        GetSidSubAuthority, GetSidSubAuthorityCount, GetTokenInformation, LookupAccountNameW, PSID, RevertToSelf, SID_NAME_USE, TOKEN_APPCONTAINER_INFORMATION, TOKEN_INFORMATION_CLASS,
+        TOKEN_MANDATORY_LABEL, TOKEN_QUERY, TOKEN_USER, TokenAppContainerSid, TokenIntegrityLevel, TokenIsAppContainer, TokenSessionId, TokenUser,
+    };
+    use windows_sys::Win32::System::Pipes::{GetNamedPipeClientProcessId, GetNamedPipeServerProcessId, ImpersonateNamedPipeClient};
+    use windows_sys::Win32::System::SystemInformation::GetSystemTimePreciseAsFileTime;
+    use windows_sys::Win32::System::Threading::{
+        GetCurrentProcess, GetCurrentThread, GetProcessTimes, OpenProcess, OpenProcessToken, OpenThreadToken, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+    };
 
-    use super::Peer;
+    pub use windows_sys::Win32::Foundation::HANDLE;
+
+    use super::{Peer, PipeToken, ProcessKey};
 
     fn wide(text: &str) -> Vec<u16> {
         text.encode_utf16().chain(std::iter::once(0)).collect()
@@ -293,6 +385,154 @@ mod windows {
         }
     }
 
+    fn filetime(time: FILETIME) -> u64 {
+        (u64::from(time.dwHighDateTime) << 32) | u64::from(time.dwLowDateTime)
+    }
+
+    /// The system time, precise, in the `FILETIME` units process creation
+    /// times use. A connect stamped with it after the connect returns is never
+    /// earlier than the creation time of the process that connected, unless
+    /// the clock is set back in between.
+    pub fn system_time() -> u64 {
+        let mut now = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        // SAFETY: a valid out-pointer.
+        unsafe { GetSystemTimePreciseAsFileTime(&mut now) };
+        filetime(now)
+    }
+
+    fn open_process(pid: u32) -> std::io::Result<Owned> {
+        // SAFETY: an ordinary query-only open; closed by `Owned`.
+        let process = Owned(unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) });
+        if process.0.is_null() {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(process)
+    }
+
+    fn creation_time(process: HANDLE) -> std::io::Result<u64> {
+        let zero = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        let (mut created, mut exited, mut kernel, mut user) = (zero, zero, zero, zero);
+        // SAFETY: four valid out-pointers.
+        if unsafe { GetProcessTimes(process, &mut created, &mut exited, &mut kernel, &mut user) } == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(filetime(created))
+    }
+
+    /// A process's id and creation time, from a handle the caller holds.
+    pub fn process_key(process: HANDLE, pid: u32) -> std::io::Result<ProcessKey> {
+        Ok(ProcessKey { pid, created: creation_time(process)? })
+    }
+
+    /// The process a connected pipe recorded as its client, opened once and
+    /// refused if it was created after `connected_at`.
+    fn open_pipe_client(pipe: HANDLE, connected_at: u64) -> std::io::Result<(u32, Owned, u64)> {
+        let mut pid = 0u32;
+        // SAFETY: valid out-pointer on a connected pipe.
+        if unsafe { GetNamedPipeClientProcessId(pipe, &mut pid) } == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let process = open_process(pid)?;
+        let created = creation_time(process.0)?;
+        if created > connected_at {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "the pipe client's process id names a process created after the connect",
+            ));
+        }
+        Ok((pid, process, created))
+    }
+
+    /// A token information class, in a buffer aligned for the structure it
+    /// holds.
+    fn token_information(token: HANDLE, class: TOKEN_INFORMATION_CLASS) -> std::io::Result<Vec<usize>> {
+        let mut len = 0u32;
+        // SAFETY: a size query with a null buffer.
+        unsafe { GetTokenInformation(token, class, std::ptr::null_mut(), 0, &mut len) };
+        if len == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let mut buffer = vec![0usize; (len as usize).div_ceil(std::mem::size_of::<usize>())];
+        // SAFETY: `buffer` holds at least `len` bytes, suitably aligned.
+        if unsafe { GetTokenInformation(token, class, buffer.as_mut_ptr().cast(), len, &mut len) } == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(buffer)
+    }
+
+    fn token_u32(token: HANDLE, class: TOKEN_INFORMATION_CLASS) -> std::io::Result<u32> {
+        let mut value = 0u32;
+        let mut len = 0u32;
+        // SAFETY: `value` is valid for the four bytes passed.
+        if unsafe { GetTokenInformation(token, class, (&mut value as *mut u32).cast(), 4, &mut len) } == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(value)
+    }
+
+    fn token_user(token: HANDLE) -> std::io::Result<String> {
+        let buffer = token_information(token, TokenUser)?;
+        // SAFETY: TokenUser fills a TOKEN_USER at the start of the buffer.
+        let user = unsafe { &*(buffer.as_ptr().cast::<TOKEN_USER>()) };
+        sid_string(user.User.Sid)
+    }
+
+    fn token_integrity(token: HANDLE) -> std::io::Result<u32> {
+        let buffer = token_information(token, TokenIntegrityLevel)?;
+        // SAFETY: TokenIntegrityLevel fills a TOKEN_MANDATORY_LABEL whose SID
+        // lies within the buffer; its last subauthority is the level's RID.
+        unsafe {
+            let label = &*(buffer.as_ptr().cast::<TOKEN_MANDATORY_LABEL>());
+            let count = *GetSidSubAuthorityCount(label.Label.Sid);
+            if count == 0 {
+                return Err(std::io::Error::other("an integrity label without a level"));
+            }
+            Ok(*GetSidSubAuthority(label.Label.Sid, u32::from(count) - 1))
+        }
+    }
+
+    fn token_app_container(token: HANDLE) -> std::io::Result<Option<String>> {
+        if token_u32(token, TokenIsAppContainer)? == 0 {
+            return Ok(None);
+        }
+        let buffer = token_information(token, TokenAppContainerSid)?;
+        // SAFETY: TokenAppContainerSid fills a TOKEN_APPCONTAINER_INFORMATION
+        // whose SID lies within the buffer.
+        let info = unsafe { &*(buffer.as_ptr().cast::<TOKEN_APPCONTAINER_INFORMATION>()) };
+        sid_string(info.TokenAppContainer).map(Some)
+    }
+
+    /// The pipe client's token, read by impersonating it on this thread.
+    /// Tokio's pipe client connects at identification level, so the thread
+    /// can read its token but act as no one; at any level the impersonation
+    /// is reverted before this returns, with nothing awaited in between.
+    pub(crate) fn pipe_token(pipe: HANDLE) -> std::io::Result<PipeToken> {
+        // SAFETY: changes only this thread's token, reverted below.
+        if unsafe { ImpersonateNamedPipeClient(pipe) } == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let mut token: HANDLE = std::ptr::null_mut();
+        // SAFETY: valid out-pointer; opened as this process, since an
+        // identification-level token cannot open objects itself.
+        let opened = unsafe { OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, 1, &mut token) };
+        let error = std::io::Error::last_os_error();
+        // SAFETY: ends the impersonation begun above.
+        if unsafe { RevertToSelf() } == 0 {
+            // A thread left wearing the client's token must not run on.
+            std::process::abort();
+        }
+        if opened == 0 {
+            return Err(error);
+        }
+        let token = Owned(token);
+        Ok(PipeToken {
+            user: token_user(token.0)?,
+            session: token_u32(token.0, TokenSessionId)?,
+            integrity: token_integrity(token.0)?,
+            app_container: token_app_container(token.0)?,
+        })
+    }
+
     /// The SID of a process's token user, as an SDDL string.
     fn process_sid(process: HANDLE) -> std::io::Result<String> {
         let mut token: HANDLE = std::ptr::null_mut();
@@ -301,20 +541,7 @@ mod windows {
             return Err(std::io::Error::last_os_error());
         }
         let token = Owned(token);
-        let mut len = 0u32;
-        // SAFETY: a size query with a null buffer.
-        unsafe { GetTokenInformation(token.0, TokenUser, std::ptr::null_mut(), 0, &mut len) };
-        if len == 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        let mut buffer = vec![0usize; (len as usize).div_ceil(std::mem::size_of::<usize>())];
-        // SAFETY: `buffer` holds at least `len` bytes, suitably aligned.
-        if unsafe { GetTokenInformation(token.0, TokenUser, buffer.as_mut_ptr().cast(), len, &mut len) } == 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        // SAFETY: TokenUser fills a TOKEN_USER at the start of the buffer.
-        let user = unsafe { &*(buffer.as_ptr().cast::<TOKEN_USER>()) };
-        sid_string(user.User.Sid)
+        token_user(token.0)
     }
 
     fn sid_string(sid: PSID) -> std::io::Result<String> {
@@ -330,44 +557,39 @@ mod windows {
         Ok(value)
     }
 
-    fn peer_sid(pid: u32) -> std::io::Result<String> {
-        // SAFETY: an ordinary query-only open; closed by `Owned`.
-        let process = Owned(unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) });
-        if process.0.is_null() {
-            return Err(std::io::Error::last_os_error());
-        }
-        process_sid(process.0)
+    /// The pipe client's process and, where the OS could say, its image, both
+    /// from one handle.
+    pub(crate) fn pipe_client_process(pipe: HANDLE, connected_at: u64) -> std::io::Result<(ProcessKey, Option<String>)> {
+        let (pid, process, created) = open_pipe_client(pipe, connected_at)?;
+        Ok((ProcessKey { pid, created }, image_of(process.0).ok()))
     }
 
-    /// The main executable of a process, as a Win32 path.
-    pub fn process_image(pid: u32) -> std::io::Result<String> {
-        // SAFETY: an ordinary query-only open; closed by `Owned`.
-        let process = Owned(unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) });
-        if process.0.is_null() {
-            return Err(std::io::Error::last_os_error());
-        }
+    fn image_of(process: HANDLE) -> std::io::Result<String> {
         let mut buffer = vec![0u16; 32 * 1024];
         let mut len = buffer.len() as u32;
         // SAFETY: `buffer` is valid for `len` UTF-16 units.
-        if unsafe { QueryFullProcessImageNameW(process.0, 0, buffer.as_mut_ptr(), &mut len) } == 0 {
+        if unsafe { QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut len) } == 0 {
             return Err(std::io::Error::last_os_error());
         }
         Ok(String::from_utf16_lossy(&buffer[..len as usize]))
     }
 
-    /// The peer on the client end of a connected pipe instance: its token
-    /// SID, and its executable where the OS could say so. Both are read by the
-    /// client's process id after the pipe connects, so they describe that id
-    /// at the time of the read, not the connection itself; a process id reused
-    /// in between would name another program.
+    /// The main executable of a process, as a Win32 path.
+    pub fn process_image(pid: u32) -> std::io::Result<String> {
+        image_of(open_process(pid)?.0)
+    }
+
+    /// The peer on the client end of a connected pipe instance: its process
+    /// token's SID, and its executable where the OS could say so. Both are
+    /// read from one handle to the process the pipe recorded, refused if that
+    /// process was created after this call began, so a process id reused in
+    /// between cannot mix two programs. A caller that saw the connect earlier
+    /// passes its own time, and reads the token through the pipe, with
+    /// [`super::Connected::pipe_client`].
     pub fn pipe_client_peer(handle: HANDLE) -> std::io::Result<Peer> {
-        let mut pid = 0u32;
-        // SAFETY: valid out-pointer on a connected pipe.
-        if unsafe { GetNamedPipeClientProcessId(handle, &mut pid) } == 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        let sid = peer_sid(pid)?;
-        let image = process_image(pid).ok();
+        let (pid, process, _) = open_pipe_client(handle, system_time())?;
+        let sid = process_sid(process.0)?;
+        let image = image_of(process.0).ok();
         Ok(Peer::Windows { sid, pid, image })
     }
 
@@ -379,7 +601,7 @@ mod windows {
         if unsafe { GetNamedPipeServerProcessId(handle, &mut pid) } == 0 {
             return Err(std::io::Error::last_os_error());
         }
-        let sid = peer_sid(pid)?;
+        let sid = process_sid(open_process(pid)?.0)?;
         Ok(Peer::Windows { sid, pid, image: None })
     }
 
