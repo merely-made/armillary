@@ -145,6 +145,18 @@ runner.
 
   Links: plans djinn-slimming S3, S4 · summary authority.admit_custody(&call) becomes call.admitted_by(&authority).
 
+- **D14. M1 lands first, and S4 carries its Mere side (Mark, 2026-11-01):**
+  "M1 lands, then S3, S4 carries it (Recommended)", over the M1 lane adopting
+  in Mere after S4 or before it. Capability-door M1's Armillary change
+  (`m1/manifests`, `bd77d60`, on S2) edits `custody_identity.rs`, which S3
+  moves, so it lands on Armillary main before S3 starts. S4 repoints Mere to
+  a revision that includes it and takes M1's Mere branch (`f427b6466`) in the
+  same change: `admitted_by` in `custody.rs`, the broker's consent refusal,
+  and the payload seal scope from `AppAuthority::payload_scope`. Because M1
+  refuses undeclared hellos, the repin changes behaviour as well as paths.
+
+  Links: draws on mere:capability-door M1 · plans djinn-slimming S3, S4 · summary M1's Armillary commit lands before S3; S4's Mere repin carries M1's Mere branch in one change.
+
 ## Open forks
 
 None. F1 was closed by D8, F2 by D5 to D7 and F3 by D9.
@@ -327,6 +339,8 @@ launcher, the grant logic, the listener and `resident`.
 
 ### S3. The custody crate (Dramatis)
 
+Starts once capability-door M1's Armillary commit is on main (D14).
+
 The new Dramatis crate holds `custody`, `custody_client`, `custody_identity`,
 `custody_payload` and `quarantine`, plus the custody-payload tests from
 `app_client` and `wire`. It depends on the door contract and the Dramatis
@@ -372,3 +386,4 @@ the custody crate; its projection features depend on the contract.
 - 2026-11-01: S0 done. I1's additions placed, two missed consumers added,
   both names still free (S1); D8 and D9 answered, closing F1 and F3.
 - 2026-11-01: S2 done: ostiary cut, D10 to D13 answered on the way.
+- 2026-11-01: D14 orders M1 before S3 and folds M1's Mere side into S4.
