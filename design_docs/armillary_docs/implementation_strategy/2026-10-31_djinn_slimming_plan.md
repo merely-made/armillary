@@ -1,6 +1,6 @@
 # Djinn slimming plan
 
-**Status:** 2026-11-02, S4 under way (D18 to D21).
+**Status:** 2026-11-02, S4 done (D18 to D22); S5 next.
 Consumers outside Armillary and Dramatis still pin Djinn revisions from
 before the cut and move in S4. Findings were measured against Armillary `019d1e5` (Djinn's sources
 unchanged since `104b8d4`) and Mere `23bb596e2`.
@@ -215,6 +215,19 @@ runner.
   comes back as a fork.
 
   Links: plans djinn-slimming S4 · summary knot-editor depends on ostiary and castellan-client, not Djinn.
+
+- **D22. The seal scope is declared, with the label table as fallback (Mark,
+  2026-11-02):** "2 and make removing the fallback part of the m1 lane", over
+  keeping the label table (recommended) or switching outright. D14 had S4
+  carry the seal scope, but M1's Mere branch still chose it by label, and
+  neither Turnstone nor Graphshell declared one; grants on disk pin none.
+  Mere's `custody/payload.rs` seals under `AppAuthority::payload_scope` when
+  the scope is declared and granted, and under the label's scope otherwise,
+  so nothing is refused. Graphshell declares its existing string. Removing
+  the fallback, after Turnstone declares, is the M1 lane's (capability door
+  D30).
+
+  Links: amends djinn-slimming D14 · draws on mere:capability-door D30 · summary Retained content seals under the declared, granted scope, falling back to the label's; the M1 lane removes the fallback.
 
 ## Open forks
 
@@ -456,6 +469,33 @@ crates in the same workspace.
 
 ### S4. Consumers
 
+Done 2026-11-02, in the order below (D18 to D22). Dramatis `9d6e77e`
+(ostiary repinned), Knot `57ce57c` then `3eac0b0` (repin), Mere `d1055540d`
+(merge of `m1/manifests`, M1's keys renumbered D24 to D30 there because Mere
+main already held D22 and D23, then the repoint), Cleromancy `e5b392d`
+(merge of `m1/declarations`), isocosm `952d05c4` (the whole wing's 202 Mere
+pins, 16 manifests, four locks).
+- Checks: Knot's workspace and the nine touched Mere packages check with
+  `--locked`, all targets, against the pushed Knot; every changed feature set
+  and the two `wasm32-unknown-unknown` fixtures build. Cleromancy checks with
+  `--locked`. isocosm's four locks resolve under `--locked`; the isocosm
+  wing is not built, and its lanes fix what the new rev breaks.
+- Locks: each moves only Mere, Dramatis, Armillary and Knot packages, and
+  Knot's, Mere's and Cleromancy's hold one ostiary, one Djinn and one
+  castellan-client. `cargo update -p knot-editor` sweeps floating genet,
+  murm and retinue revisions; each repin reverted them.
+- Fixtures: the seven `custody-projection` fixtures pass with their forbidden
+  checks naming `custody_client` and `app_client` from the new crates, and the
+  combined resident fixture's audit shows one copy of each. Mere's
+  unused-patch warnings equal the base's (nine crates, same counts).
+- Tests: the two broker tests hung because M1's declaration-only admission
+  refuses a bare hello and `serve_app_connection` writes no frame, so the
+  client waits for a challenge forever; seven tests now declare. The rest
+  pass except six known Windows failures and one load-sensitive
+  `published_replay_regression` test, unverified on Mere main.
+- The M1 lane has the new API forms and its follow-up (removing D22's label
+  fallback).
+
 The table above is the list. Suppliers go first: the contract and Djinn in
 Armillary, then the custody crate in Dramatis. Knot goes before Mere, since a
 breaking change lands in Knot first and is briefly red (lockstep rule).
@@ -501,4 +541,5 @@ dev-dependency.
 - 2026-11-01: S3 done: castellan-client in Dramatis, D15 to D17 answered.
 - 2026-11-02: S3 cross-checked on Linux and macOS; one macOS flake in
   Djinn's listener tests, untouched by S3.
-- 2026-11-02: S4 surveyed; D18 to D21 answered.
+- 2026-11-02: S4 surveyed; D18 to D21 answered, then D22 (the seal scope).
+- 2026-11-02: S4 done: Dramatis, Knot, Mere, Cleromancy and isocosm landed.
