@@ -388,6 +388,21 @@ dependencies are gone.
   `types` (117 packages) and `client` (128); the types fixture cannot name
   `custody_client`. Armillary's `check.sh` passes its remaining three.
 - The Dramatis repo plan has its DR-C line.
+- Cross-check 2026-11-02, fresh clones of Armillary `bf86882` and Dramatis
+  `baa4ed2` on Linux (T-PC) and macOS (Q-PC, x86_64): every feature set
+  checks, `cargo tree -p djinn` names no Dramatis crate, ostiary's 38 tests
+  pass, and both fixture tiers pass. On Linux, Djinn's lib tests number 62
+  at `0ccfe7a` and 38 at `bf86882`; the 24 that left are by name the 24 that
+  castellan-client runs there, its 22 plus two `cfg(unix)` tests carried
+  from Djinn. On macOS, one of ten full Djinn runs failed
+  `local_endpoint::unix_tests::a_stale_same_user_socket_is_removed`
+  (`prepare_unix_endpoint` refused the stale socket, line 625). S3 did not
+  touch that file. Repeated on Q-PC: 0 of 300 alone, as was the S2 launch
+  test, and 1 of 100 full runs. A suspect, not proven, shared with the S2
+  flake: the launcher's test forks through `pre_exec`, so for a moment the
+  child holds every descriptor in the test process, including another
+  test's just-dropped listener, which then still answers the probe; its
+  pipe also lacks close-on-exec.
 
 
 The new Dramatis crate holds `custody`, `custody_client`, `custody_identity`,
@@ -439,3 +454,5 @@ the custody crate; its projection features depend on the contract.
 - 2026-11-01: S2 done: ostiary cut, D10 to D13 answered on the way.
 - 2026-11-01: D14 orders M1 before S3 and folds M1's Mere side into S4.
 - 2026-11-01: S3 done: castellan-client in Dramatis, D15 to D17 answered.
+- 2026-11-02: S3 cross-checked on Linux and macOS; one macOS flake in
+  Djinn's listener tests, untouched by S3.
