@@ -11,6 +11,7 @@ Canonical migration: `mere/design_docs/mere_docs/implementation_strategy/2026-10
 | `armillary` | [crates/armillary](crates/armillary) |
 | `apparatus-core` | [crates/apparatus-core](crates/apparatus-core) |
 | `djinn` | [crates/djinn](crates/djinn) |
+| `ostiary` | [crates/ostiary](crates/ostiary) |
 
 Run `cargo test --workspace` for default library coverage. Optional network, GPU, external model and host acceptance have separate gates. No registry release is implied by this source promotion.
 
@@ -37,7 +38,8 @@ or product identity types. Once-only resource initialization can use the
 standard library's `LazyLock` directly.
 
 Djinn owns the finite application door, selected native custody clients, and
-resident service/task lifetimes. Mere supplies concrete product composition in
+resident service/task lifetimes; `ostiary` is the door's contract, which
+applications depend on instead of Djinn. Mere supplies concrete product composition in
 `mere-resident`, retaining the `djinn` executable names. Armillary itself has no
 Djinn or product dependency. See [Djinn features and authority boundaries](crates/djinn/README.md)
 and the [qualification receipt](support/receipts/djinn-ownership-20261030.json).

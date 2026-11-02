@@ -17,7 +17,7 @@ use std::io::{Read, Write};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 #[cfg(all(
-    feature = "door-native",
+    feature = "native",
     any(unix, windows),
     not(target_arch = "wasm32")
 ))]
@@ -118,7 +118,7 @@ where
 /// Read one native-messaging JSON frame from an asynchronous stream, with the
 /// same size and truncation behavior as [`read_native_message`].
 #[cfg(all(
-    feature = "door-native",
+    feature = "native",
     any(unix, windows),
     not(target_arch = "wasm32")
 ))]
@@ -144,7 +144,7 @@ where
 
 /// Write one native-messaging JSON frame to an asynchronous stream.
 #[cfg(all(
-    feature = "door-native",
+    feature = "native",
     any(unix, windows),
     not(target_arch = "wasm32")
 ))]
@@ -232,7 +232,7 @@ mod tests {
     }
 
     #[cfg(all(
-        feature = "door-native",
+        feature = "native",
         any(unix, windows),
         not(target_arch = "wasm32")
     ))]
@@ -307,7 +307,7 @@ mod tests {
     }
 
     #[cfg(all(
-        feature = "door-native",
+        feature = "native",
         any(unix, windows),
         not(target_arch = "wasm32")
     ))]
@@ -382,7 +382,7 @@ mod tests {
     }
 
     #[cfg(all(
-        feature = "door-native",
+        feature = "native",
         any(unix, windows),
         not(target_arch = "wasm32")
     ))]
@@ -411,7 +411,7 @@ mod tests {
     }
 
     #[cfg(all(
-        feature = "door-native",
+        feature = "native",
         any(unix, windows),
         not(target_arch = "wasm32")
     ))]
@@ -464,7 +464,7 @@ mod tests {
     }
 
     #[cfg(all(
-        feature = "door-native",
+        feature = "native",
         any(unix, windows),
         not(target_arch = "wasm32")
     ))]

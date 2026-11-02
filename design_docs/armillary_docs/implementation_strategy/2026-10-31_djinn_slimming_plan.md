@@ -1,9 +1,9 @@
 # Djinn slimming plan
 
-**Status:** 2026-11-01, S0 done; S2 next. Capability-door I1 is recorded as
-landed (D4), and the findings are re-measured against it (Armillary
-`019d1e5`, Djinn's sources unchanged since `104b8d4`; Mere `23bb596e2`). F1
-and F3 answered (D8, D9). No build was run for these findings.
+**Status:** 2026-11-01, S2 done (ostiary in Armillary); S3 next. Consumers
+outside Armillary still pin Djinn revisions from before the cut and move in
+S4. Findings were measured against Armillary `019d1e5` (Djinn's sources
+unchanged since `104b8d4`) and Mere `23bb596e2`.
 
 **For:** Mere's distillery extraction D18 ("Publish the djinn chain, but also,
 aren't we supposed to be moving those services so djinn isn't a god crate and
@@ -111,6 +111,39 @@ runner.
   not cover.
 
   Links: draws on mere:capability-door D21, W1 · closes djinn-slimming F3 · summary ostiary exposes the admitted stream after the hello so W1 can carry the WIT calls over the door; script-wire stays above it.
+
+- **D10. Moved tests open over a stream (Mark, 2026-11-01):** "open_over(stream)
+  (Recommended)", over a `testkit` feature exposing a handshake-free
+  constructor or rewriting the custody tests with neutral payloads. Two
+  custody tests built an `AppConnection` from its private fields;
+  `AppConnection::open_over(stream, hello)` runs the real handshake over a
+  stream the caller holds (D9's `into_stream` is its inverse), and the moved
+  tests drive a host's side of it.
+
+  Links: plans djinn-slimming S2 · summary ostiary's AppConnection::open_over runs the handshake over a given stream; the moved custody tests use it.
+
+- **D11. Ostiary keeps the module names, flat (Mark, 2026-11-01):** "Same
+  names, flat (Recommended)", over shorter names or keeping a `door::` level.
+  `djinn::door::{app_admission, app_client, declaration, frame, launch,
+  local_endpoint, route, wire}` become `ostiary::…`, so S4 is a path rewrite.
+
+  Links: plans djinn-slimming S2, S4 · summary ostiary's modules keep Djinn's door module names at the crate root.
+
+- **D12. Djinn keeps its feature names (Mark, 2026-11-01):** "Keep the names
+  (Recommended)", over collapsing to `door-serve`. `door` is ostiary plus the
+  owner's grants, `door-native` turns on `ostiary/native`, and `door-serve`
+  is unchanged, so no consumer's feature list changes in S4.
+
+  Links: plans djinn-slimming S2, S4 · summary Djinn's door, door-native and door-serve features keep their names over ostiary.
+
+- **D13. Custody admission is a method on the call (Mark, 2026-11-01):**
+  "Method on CustodyCall (Recommended)", over an extension trait or a free
+  function. `impl AppAuthority { admit_custody }` in custody could not stay
+  once `AppAuthority` moved to ostiary; `CustodyCall::admitted_by(&authority)`
+  moves to castellan-client in S3 with the call type. mere-resident's one
+  caller (`ports/mere-resident/src/custody.rs:279`) changes in S4.
+
+  Links: plans djinn-slimming S3, S4 · summary authority.admit_custody(&call) becomes call.admitted_by(&authority).
 
 ## Open forks
 
@@ -243,6 +276,35 @@ Chosen and recorded in the naming ledger: `ostiary` (D5) and
 
 ### S2. The door contract crate (Armillary)
 
+Done 2026-11-01. `crates/ostiary` holds `wire`, `frame`, `route`,
+`declaration`, the admission types and endpoint functions, `app_client`, the
+dialer and the child's side of `launch`; Djinn keeps the grants, launcher,
+listener, server, link, custody and `resident`, and depends on ostiary.
+- D8: `unix_app_endpoint` copies the fallback; `the_socket_path_is_pinned`
+  pins it, macOS case included, and runs on every platform.
+- D9, D10: `AppConnection::open_over` and `into_stream`;
+  `an_admitted_connection_hands_its_stream_to_another_protocol` carries raw
+  bytes after the handshake.
+- Tests: Djinn had 82 on Windows with all features. Every one survives by
+  name, 49 in Djinn and 33 in ostiary, plus the two above. The custody tests
+  from `wire` and `app_client` wait in Djinn's `custody` and
+  `custody_client` for S3. Of `app_admission`'s 21 tests (19 run on
+  Windows), the eight about the hello, the launch handle and the endpoint
+  moved; the thirteen about grants stayed.
+- `cargo tree -p ostiary`: serde, serde_json, thiserror and zeroize; with
+  `native`, also tokio, base64 and rand_core; no Dramatis crate, Armillary,
+  peer-facts or Djinn. The portable tier checks for `wasm32-unknown-unknown`.
+- Each Djinn feature (`door`, `door-native`, `door-serve`, `custody`,
+  `custody-client`, `resident`) checks alone without warnings. Djinn has no
+  re-export of ostiary.
+- Fixtures: `support/fixtures/{portable,native}` became
+  `support/fixtures/ostiary/`, and `support/fixtures/check.sh` runs all five,
+  forbidding Dramatis, Armillary, peer-facts and Djinn in ostiary's cone.
+- Not checked: Linux and macOS targets. This machine has no Unix Rust target,
+  so the Unix-only paths (the launcher's `ostiary::launch` imports, the
+  `inherited` read and the Unix dialer) compiled only on Windows.
+
+
 The contract crate is a new Armillary workspace member. It holds `wire`,
 `frame`, `route`, `declaration`, the admission types, `app_client`, the
 dialer and the launched child's side of `launch` (`inherited`, `claim`), with
@@ -309,3 +371,4 @@ the custody crate; its projection features depend on the contract.
 - 2026-11-01: naming round, D5 to D7; F2 closed.
 - 2026-11-01: S0 done. I1's additions placed, two missed consumers added,
   both names still free (S1); D8 and D9 answered, closing F1 and F3.
+- 2026-11-01: S2 done: ostiary cut, D10 to D13 answered on the way.

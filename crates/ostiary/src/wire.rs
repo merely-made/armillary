@@ -12,14 +12,14 @@
 //! by `super::app_client` on native platforms; clients supply typed operations.
 
 #[cfg(all(
-    feature = "door-serve",
+    feature = "native",
     any(unix, windows),
     not(target_arch = "wasm32")
 ))]
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-use crate::door::app_admission::AppId;
+use crate::app_admission::AppId;
 
 /// Schema of the connect answer an application sends.
 pub const APP_CONNECT_SCHEMA: &str = "mere.graphshell/app-connect/v1";
@@ -38,7 +38,7 @@ pub struct BrowserChallenge {
 impl BrowserChallenge {
     /// A challenge with a fresh 32-byte host nonce, base64url without padding.
     #[cfg(all(
-        feature = "door-serve",
+        feature = "native",
         any(unix, windows),
         not(target_arch = "wasm32")
     ))]
@@ -124,51 +124,8 @@ mod tests {
         ));
     }
 
-    #[cfg(all(feature = "custody", any(unix, windows), not(target_arch = "wasm32")))]
-    #[test]
-    fn released_custody_answer_preserves_exact_wire_fixture() {
-        use crate::door::custody::{CustodyAnswer, CustodyRefusal};
-        type Outgoing = AppHostMessage<(), (), Result<CustodyAnswer, CustodyRefusal>>;
-        let answer = Outgoing::Answer {
-            id: 9,
-            answer: Ok(CustodyAnswer::Released {
-                master: [0x5a; 32],
-                keys: vec![],
-            }),
-        };
-        let fixture = r#"{"type":"answer","id":9,"answer":{"Ok":{"answer":"released","master":"WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo","keys":[]}}}"#;
-        assert_eq!(serde_json::to_string(&answer).unwrap(), fixture);
-        assert_eq!(serde_json::from_str::<Outgoing>(fixture).unwrap(), answer);
-    }
-
-    #[cfg(all(feature = "custody", any(unix, windows), not(target_arch = "wasm32")))]
-    #[test]
-    fn released_answer_round_trips_nonempty_key_material() {
-        use crate::door::custody::{CustodyAnswer, CustodyRefusal, ReleasedKey};
-        use personae::IdentityProvider;
-        type Outgoing = AppHostMessage<(), (), Result<CustodyAnswer, CustodyRefusal>>;
-        let salt = b"test-release-key".to_vec();
-        let provider = personae::InMemoryProvider::from_seed([9; 32]);
-        let attestation = provider.attest_derived_key(&salt).unwrap();
-        let answer = Outgoing::Answer {
-            id: 9,
-            answer: Ok(CustodyAnswer::Released {
-                master: [0x5a; 32],
-                keys: vec![ReleasedKey {
-                    salt,
-                    seed: [0x6b; 32],
-                    attestation,
-                }],
-            }),
-        };
-        let encoded = serde_json::to_string(&answer).unwrap();
-        assert!(encoded.contains("WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo"));
-        assert!(encoded.contains("a2tra2tra2tra2tra2tra2tra2tra2tra2tra2tra2s"));
-        assert_eq!(serde_json::from_str::<Outgoing>(&encoded).unwrap(), answer);
-    }
-
     #[cfg(all(
-        feature = "door-serve",
+        feature = "native",
         any(unix, windows),
         not(target_arch = "wasm32")
     ))]

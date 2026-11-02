@@ -17,13 +17,13 @@
 
 use rand_core::{OsRng, RngCore};
 
-use crate::door::app_admission::{AppHello, AppId, AppRouteId, configured_app_endpoint};
-use crate::door::declaration::AppDeclaration;
-use crate::door::frame::{
+use crate::app_admission::{AppHello, AppId, AppRouteId, configured_app_endpoint};
+use crate::declaration::AppDeclaration;
+use crate::frame::{
     FrameError, JsonDiagnostic, read_native_message_async, write_native_message_async,
 };
-use crate::door::local_endpoint::{LocalStream, connect_local};
-use crate::door::wire::{APP_CONNECT_SCHEMA, AppHostMessage, AppMessage};
+use crate::local_endpoint::{LocalStream, connect_local};
+use crate::wire::{APP_CONNECT_SCHEMA, AppHostMessage, AppMessage};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppClientError {
@@ -66,15 +66,6 @@ pub struct AppConnection {
 }
 
 impl AppConnection {
-    #[cfg(test)]
-    pub(super) fn for_test(stream: Box<dyn LocalStream>) -> Self {
-        Self {
-            stream,
-            session: "fixture".into(),
-            next_id: 1,
-        }
-    }
-
     /// Connect to the configured endpoint and complete the whole handshake:
     /// hello, challenge, connect, connected.
     pub async fn open(app: AppId) -> Result<Self, AppClientError> {
@@ -89,7 +80,7 @@ impl AppConnection {
 
     /// The same, at an explicit endpoint. Tests and receipts use this.
     pub async fn open_at(endpoint: &str, app: AppId) -> Result<Self, AppClientError> {
-        Self::open_with_hello(endpoint, AppHello::new(app.clone()), app).await
+        Self::open_with_hello(endpoint, AppHello::new(app)).await
     }
 
     /// Route-aware connection at an explicit endpoint.
@@ -98,7 +89,7 @@ impl AppConnection {
         app: AppId,
         route: AppRouteId,
     ) -> Result<Self, AppClientError> {
-        Self::open_with_hello(endpoint, AppHello::for_route(app.clone(), route), app).await
+        Self::open_with_hello(endpoint, AppHello::for_route(app, route)).await
     }
 
     /// Connect to the configured endpoint, request `route` and carry the
@@ -118,21 +109,27 @@ impl AppConnection {
         route: AppRouteId,
         declaration: AppDeclaration,
     ) -> Result<Self, AppClientError> {
-        let hello = AppHello::for_route(app.clone(), route).declaring(declaration);
-        Self::open_with_hello(endpoint, hello, app).await
+        let hello = AppHello::for_route(app, route).declaring(declaration);
+        Self::open_with_hello(endpoint, hello).await
     }
 
-    async fn open_with_hello(
-        endpoint: &str,
+    async fn open_with_hello(endpoint: &str, hello: AppHello) -> Result<Self, AppClientError> {
+        Self::open_over(connect_local(endpoint).await?, hello).await
+    }
+
+    /// Complete the whole handshake over a stream the caller already holds,
+    /// such as a channel a parent passed down, rather than dialing an
+    /// endpoint. [`Self::into_stream`] is the inverse.
+    pub async fn open_over(
+        mut stream: Box<dyn LocalStream>,
         hello: AppHello,
-        app: AppId,
     ) -> Result<Self, AppClientError> {
+        let app = hello.app.clone();
         // A process Djinn launched carries its handle on every route hello.
-        let hello = match (hello.route.is_some(), crate::door::launch::inherited()) {
+        let hello = match (hello.route.is_some(), crate::launch::inherited()) {
             (true, Some(handle)) => hello.launched(handle),
             _ => hello,
         };
-        let mut stream = connect_local(endpoint).await?;
         write_native_message_async(&mut stream, &hello).await?;
         let challenge =
             match read_host::<serde::de::IgnoredAny, serde::de::IgnoredAny, serde::de::IgnoredAny>(
@@ -186,6 +183,14 @@ impl AppConnection {
     /// The session id the host admitted.
     pub fn session(&self) -> &str {
         &self.session
+    }
+
+    /// The admitted stream, for a protocol other than this envelope to carry
+    /// from here on: the projection session's generated calls (capability
+    /// door W1, djinn-slimming D9). The host must hand its side over at the
+    /// same point.
+    pub fn into_stream(self) -> Box<dyn LocalStream> {
+        self.stream
     }
 
     pub fn next_id(&mut self) -> u64 {
@@ -355,112 +360,6 @@ mod tests {
         server_task.await.unwrap();
     }
 
-    #[cfg(feature = "custody")]
-    fn released_answer() -> crate::door::custody::CustodyAnswer {
-        use crate::door::custody::{CustodyAnswer, ReleasedKey};
-        use personae::IdentityProvider;
-        let salt = b"test-release-key".to_vec();
-        let provider = personae::InMemoryProvider::from_seed([9; 32]);
-        let attestation = provider.attest_derived_key(&salt).unwrap();
-        CustodyAnswer::Released {
-            master: [0x5a; 32],
-            keys: vec![ReleasedKey {
-                salt,
-                seed: [0x6b; 32],
-                attestation,
-            }],
-        }
-    }
-
-    #[cfg(feature = "custody")]
-    fn assert_release_secrets_absent(error: &AppClientError) {
-        let sentinels = [
-            "WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo",
-            "a2tra2tra2tra2tra2tra2tra2tra2tra2tra2tra2s",
-            "107, 107, 107",
-            "90, 90, 90",
-        ];
-        let mut errors: Vec<&dyn std::error::Error> = vec![error];
-        while let Some(cause) = errors.pop() {
-            let description = format!("{cause:?} {cause}");
-            for sentinel in sentinels {
-                assert!(!description.contains(sentinel));
-            }
-            if let Some(source) = cause.source() {
-                errors.push(source);
-            }
-        }
-    }
-
-    #[cfg(feature = "custody")]
-    #[tokio::test]
-    async fn unexpected_real_custody_release_does_not_leak_in_error_chain() {
-        use crate::door::custody::CustodyRefusal;
-        let (client, mut server) = tokio::io::duplex(4096);
-        let mut connection = AppConnection {
-            stream: Box::new(client),
-            session: "fixture".into(),
-            next_id: 1,
-        };
-        let host = tokio::spawn(async move {
-            let _: Option<AppMessage<String, ()>> =
-                read_native_message_async(&mut server).await.unwrap();
-            let answer = AppHostMessage::<(), (), _>::Answer {
-                id: 1,
-                answer: Ok::<_, CustodyRefusal>(released_answer()),
-            };
-            write_native_message_async(&mut server, &answer)
-                .await
-                .unwrap();
-        });
-        let error = connection
-            .request::<_, String, ()>("request")
-            .await
-            .unwrap_err();
-        assert!(matches!(error, AppClientError::UnexpectedAnswer { .. }));
-        assert_release_secrets_absent(&error);
-        host.await.unwrap();
-    }
-
-    #[cfg(feature = "custody")]
-    #[tokio::test]
-    async fn mismatched_custody_release_does_not_leak_key_material() {
-        use crate::door::custody::{CustodyAnswer, CustodyRefusal};
-        let (client, mut server) = tokio::io::duplex(4096);
-        let mut connection = AppConnection {
-            stream: Box::new(client),
-            session: "fixture".into(),
-            next_id: 1,
-        };
-        let host = tokio::spawn(async move {
-            let call: AppMessage<(), String> = read_native_message_async(&mut server)
-                .await
-                .unwrap()
-                .unwrap();
-            assert!(matches!(call, AppMessage::Call { id: 1, .. }));
-            let answer = AppHostMessage::<(), (), _>::Answer {
-                id: 99,
-                answer: Ok::<_, CustodyRefusal>(released_answer()),
-            };
-            write_native_message_async(&mut server, &answer)
-                .await
-                .unwrap();
-        });
-        let error = connection
-            .call::<_, Result<CustodyAnswer, CustodyRefusal>>("release")
-            .await
-            .unwrap_err();
-        assert!(matches!(
-            error,
-            AppClientError::MismatchedResponse {
-                expected: 1,
-                got: 99
-            }
-        ));
-        assert_release_secrets_absent(&error);
-        host.await.unwrap();
-    }
-
     #[tokio::test]
     async fn request_and_call_share_ids_and_reject_a_mismatched_answer() {
         #[derive(serde::Serialize, serde::Deserialize)]
@@ -519,6 +418,39 @@ mod tests {
                 got: 99
             }
         ));
+        host.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_admitted_connection_hands_its_stream_to_another_protocol() {
+        use crate::wire::BrowserChallenge;
+        let (client, mut server) = tokio::io::duplex(4096);
+        let host = tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let hello: AppHello = read_native_message_async(&mut server).await.unwrap().unwrap();
+            let challenge = AppHostMessage::<(), (), ()>::Challenge { challenge: BrowserChallenge::fresh() };
+            write_native_message_async(&mut server, &challenge).await.unwrap();
+            let connect: AppMessage<(), ()> = read_native_message_async(&mut server).await.unwrap().unwrap();
+            assert!(matches!(connect, AppMessage::Connect { .. }));
+            let connected = AppHostMessage::<(), (), ()>::Connected { app: hello.app, session: "s1".into() };
+            write_native_message_async(&mut server, &connected).await.unwrap();
+            // From here the stream is no longer framed JSON.
+            let mut bytes = [0u8; 4];
+            server.read_exact(&mut bytes).await.unwrap();
+            assert_eq!(bytes, [0, 0xff, 0x0a, 7]);
+            server.write_all(&[9, 8]).await.unwrap();
+        });
+        let hello = AppHello::for_route(AppId::new("knot"), AppRouteId::new("projection").unwrap());
+        let connection = AppConnection::open_over(Box::new(client), hello).await.unwrap();
+        assert_eq!(connection.session(), "s1");
+        let mut stream = connection.into_stream();
+        {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            stream.write_all(&[0, 0xff, 0x0a, 7]).await.unwrap();
+            let mut answer = [0u8; 2];
+            stream.read_exact(&mut answer).await.unwrap();
+            assert_eq!(answer, [9, 8]);
+        }
         host.await.unwrap();
     }
 }

@@ -40,11 +40,11 @@ use personae::{
     Ed25519Keypair, Ed25519PublicKey, IdentityError, IdentityProvider, ProfileId, RetainedKeys,
 };
 
-use crate::door::app_admission::{AppId, configured_app_endpoint};
-use crate::door::app_client::AppClientError;
+use ostiary::app_admission::{AppId, configured_app_endpoint};
+use ostiary::app_client::AppClientError;
 use crate::door::custody::{CustodyAnswer, CustodyCall, KeySource, ResidentStatus};
 use crate::door::custody_client::{BlockingCustodyClient, CustodyClient, CustodyClientError};
-use crate::door::declaration::AppDeclaration;
+use ostiary::declaration::AppDeclaration;
 
 type JobCall = Box<dyn FnOnce(Option<&mut BlockingCustodyClient>) -> bool + Send>;
 struct Job {

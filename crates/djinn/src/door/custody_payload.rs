@@ -139,12 +139,12 @@ mod tests {
         };
         request.validate().unwrap();
         let mut framed = Vec::new();
-        super::super::frame::write_native_message(
+        ostiary::frame::write_native_message(
             &mut framed,
             &super::super::custody::CustodyCall::Payload(request.clone()),
         )
         .unwrap();
-        assert!(framed.len() < super::super::frame::MAX_NATIVE_MESSAGE_BYTES as usize);
+        assert!(framed.len() < ostiary::frame::MAX_NATIVE_MESSAGE_BYTES as usize);
         let marker = SealedBlobRef {
             epoch: eidetic::SealEpochId([0; 16]),
             format: eidetic::seal::SEAL_FORMAT_V1.into(),

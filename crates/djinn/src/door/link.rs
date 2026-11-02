@@ -6,7 +6,7 @@
 
 //! Shared local challenge and transcript binding. Labels are not credentials.
 use base64::Engine;
-use super::wire::{BrowserChallenge, BROWSER_CHALLENGE_SCHEMA};
+use ostiary::wire::{BrowserChallenge, BROWSER_CHALLENGE_SCHEMA};
 const LINK_DOMAIN: &[u8] = b"mere.graphshell/native-messaging-link/v1";
 #[derive(Debug, thiserror::Error)]
 pub enum LinkError {

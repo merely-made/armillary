@@ -9,14 +9,18 @@
 
 use std::future::Future;
 use tokio::io::{AsyncRead, AsyncWrite};
-use super::{
+use ostiary::{
+    app_admission::{AppAdmissionError, AppHello, AppId, AppRequest},
     declaration::{AppAuthority, IdentityBasis},
-    app_admission::{AllowedAppRoutes, AppAdmissionError, AppHello, AppId, AppRequest, AppRouteGrants},
     frame::{FrameError, read_native_message_async, write_native_message_async},
-    link::{LinkError, LocalLink},
-    local_endpoint::{LocalListener, LocalStream},
+    local_endpoint::LocalStream,
     route::ResidentEndpointRoute,
     wire::{APP_CONNECT_SCHEMA, AppHostMessage, AppMessage, BrowserChallenge},
+};
+use super::{
+    app_admission::{AllowedAppRoutes, AppRouteGrants},
+    link::{LinkError, LocalLink},
+    local_endpoint::LocalListener,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -106,7 +110,7 @@ mod tests {
             let link = connect(&mut r, &mut w, &admitted.app).await.unwrap().unwrap();
             (admitted, link)
         });
-        write_native_message_async(&mut client, &AppHello::for_route(AppId::new("fixture"), super::super::app_admission::AppRouteId::new("custody").unwrap())).await.unwrap();
+        write_native_message_async(&mut client, &AppHello::for_route(AppId::new("fixture"), ostiary::app_admission::AppRouteId::new("custody").unwrap())).await.unwrap();
         let Some(AppHostMessage::<(), (), ()>::Challenge { challenge }) = read_native_message_async(&mut client).await.unwrap() else { panic!("challenge") };
         write_native_message_async(&mut client, &AppMessage::<(), ()>::Connect { schema: APP_CONNECT_SCHEMA.into(), host_nonce: challenge.host_nonce, client_nonce: base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([3;32]) }).await.unwrap();
         let (admitted, link) = host.await.unwrap();

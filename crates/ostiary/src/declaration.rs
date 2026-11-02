@@ -22,7 +22,7 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::door::app_admission::{AppId, AppRouteId};
+use crate::app_admission::{AppId, AppRouteId};
 
 /// Longest name a declaration or grant may carry.
 pub const MAX_DECLARED_NAME: usize = 1024;

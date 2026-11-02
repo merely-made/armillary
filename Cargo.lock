@@ -285,6 +285,7 @@ dependencies = [
  "eidetic",
  "insigne",
  "libc",
+ "ostiary",
  "peer-facts",
  "personae",
  "rand_core 0.6.4",
@@ -719,6 +720,19 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "ostiary"
+version = "0.0.1"
+dependencies = [
+ "base64",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "zeroize",
+]
 
 [[package]]
 name = "peer-facts"

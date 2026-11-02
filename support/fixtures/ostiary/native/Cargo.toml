@@ -1,0 +1,10 @@
+[package]
+name = "ostiary-fixture-native"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+ostiary = { path = "../../../../crates/ostiary", default-features = false, features = ["native"] }

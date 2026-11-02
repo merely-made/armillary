@@ -1,7 +1,9 @@
 # Djinn
 
-Djinn provides a shared application door protocol and resident lifetime
-mechanics. Hosts supply route policy, application services and custody
+Djinn serves the application door and provides resident lifetime mechanics.
+The door's contract, what applications speak, is [`ostiary`](../ostiary):
+the hello and admission types, declarations, framing, envelopes and the
+native client. Hosts supply route policy, application services and custody
 authority. Identity domain types belong to Dramatis and Personae; custody
 wire operations do not themselves grant authority.
 
@@ -10,15 +12,14 @@ are gated out on Wasm.
 
 | Feature | API | Native | Wasm |
 | --- | --- | --- | --- |
-| `door` | Admission, application declarations and owner grants, route policy types, generic wire envelopes and bounded synchronous framing | Yes | Yes |
-| `door-native` | Local endpoint discovery and application connections | Yes | Gated out |
-| `door-serve` | Listener, shared handshake and link binding | Yes | Gated out |
+| `door` | Owner grants and route policy (`AllowedAppRoutes`, `AppRouteGrants`) over `ostiary` | Yes | Yes |
+| `door-native` | `ostiary`'s native client, for the custody clients | Yes | Gated out |
+| `door-serve` | Listener, launcher, shared handshake and link binding | Yes | Gated out |
 | `custody` | Custody, payload and quarantine types | Yes | Gated out |
 | `custody-client` | Custody and identity clients | Yes | Gated out |
 | `resident` | Task and shutdown orchestration | Yes | Gated out |
 
-`door-native` currently depends on Personae for default vault-directory
-endpoint discovery. `custody-client` adds the client side of the protected
+`custody-client` adds the client side of the protected
 custody boundary; the host retains custody dispatch, grants and secrets.
 `resident` orchestrates supplied services and shutdown actions, while the host
 chooses those services and their policy.
@@ -40,7 +41,7 @@ platform: a macOS code signature (team and identifier, checked against the
 peer's audit token), a Windows executable image (the same-user posture of a
 path, read by process id at connect rather than bound to the connection), or
 a Linux launch, where Djinn starts the application (`door::launch`) with a
-one-time handle on descriptor 3. The application calls `launch::claim()`
+one-time handle on descriptor 3. The application calls `ostiary::launch::claim()`
 first in `main`, which reads the handle, closes the descriptor and clears its
 variable before anything is spawned; its door client carries the handle on
 every route hello. A pinned label without that identity is

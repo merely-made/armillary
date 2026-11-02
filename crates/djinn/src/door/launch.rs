@@ -4,17 +4,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 
+
 //! Launching an application with a handle (capability door plan, I1).
 //!
 //! Linux has no code signature to read from a peer, so Djinn starts the
 //! application itself and hands it a one-time [`LaunchHandle`] on descriptor
-//! [`LAUNCH_FD`], named by [`LAUNCH_FD_ENV`]. The child calls [`claim`]
-//! first in `main`, which reads it, closes the descriptor and clears the
-//! variable before the child can spawn anything; its door client then carries
-//! it on every route hello; the door admits the label
-//! when the handle is live for that application. It is a secret within the
-//! same-user boundary, like the endpoint itself: it shows a connection came
-//! from the launched process or one it shared the handle with, not more.
+//! [`LAUNCH_FD`], which the child claims through `ostiary::launch`. The door
+//! admits the label while the handle is live for that application.
 //!
 //! Windows needs no secret (capability door plan, D11). Djinn holds the
 //! launched process's handle, so its id names no other process until Djinn
@@ -22,57 +18,9 @@
 //! process, by id and creation time. Its children are not the application,
 //! as on Linux.
 
-use crate::door::app_admission::LaunchHandle;
-
-/// The environment variable naming the descriptor the handle arrives on.
-pub const LAUNCH_FD_ENV: &str = "DJINN_LAUNCH_FD";
-/// The descriptor Djinn places the handle on in a process it launches.
-pub const LAUNCH_FD: i32 = 3;
-
-/// The handle this process was launched with, read once from the descriptor
-/// [`LAUNCH_FD_ENV`] names. `None` for a process Djinn did not launch.
+use ostiary::app_admission::LaunchHandle;
 #[cfg(unix)]
-pub fn inherited() -> Option<LaunchHandle> {
-    static HANDLE: std::sync::OnceLock<Option<LaunchHandle>> = std::sync::OnceLock::new();
-    *HANDLE.get_or_init(|| {
-        use std::io::Read;
-        use std::os::fd::FromRawFd;
-        let fd: i32 = std::env::var(LAUNCH_FD_ENV).ok()?.parse().ok()?;
-        if fd < 0 {
-            return None;
-        }
-        // SAFETY: the launcher placed a pipe's read end at `fd` for this
-        // process to read once; taking ownership closes it after the read.
-        let mut pipe = unsafe { std::fs::File::from_raw_fd(fd) };
-        let mut bytes = [0u8; 32];
-        pipe.read_exact(&mut bytes).ok()?;
-        Some(LaunchHandle::from_bytes(bytes))
-    })
-}
-
-/// The handle this process was launched with; never on this platform, where
-/// the door knows a launched process by the pipe.
-#[cfg(not(unix))]
-pub fn inherited() -> Option<LaunchHandle> {
-    None
-}
-
-/// Take the launch handle into this process before anything else runs: read
-/// it, close its descriptor and remove [`LAUNCH_FD_ENV`], so no child this
-/// process spawns inherits either. Call it first in `main`, before spawning
-/// threads or processes; a launched application that waits until its first
-/// route hello leaves the handle open to children started before then.
-/// Returns the handle, which later [`inherited`] calls return too.
-pub fn claim() -> Option<LaunchHandle> {
-    let handle = inherited();
-    #[cfg(unix)]
-    // SAFETY: claim runs first in `main`, before any other thread reads or
-    // writes the environment.
-    unsafe {
-        std::env::remove_var(LAUNCH_FD_ENV);
-    }
-    handle
-}
+use ostiary::launch::{LAUNCH_FD, LAUNCH_FD_ENV};
 
 /// A process Djinn launched, with the handle its connections carry.
 #[cfg(all(feature = "door-serve", unix))]
@@ -87,7 +35,7 @@ pub struct Launched {
 #[cfg(all(feature = "door-serve", unix))]
 pub fn launch(
     grants: &crate::door::app_admission::AppRouteGrants,
-    app: &crate::door::app_admission::AppId,
+    app: &ostiary::app_admission::AppId,
     program: &str,
     args: &[String],
 ) -> std::io::Result<Launched> {
@@ -100,7 +48,7 @@ pub fn launch(
 #[cfg(all(feature = "door-serve", unix))]
 pub fn launch_command(
     grants: &crate::door::app_admission::AppRouteGrants,
-    app: &crate::door::app_admission::AppId,
+    app: &ostiary::app_admission::AppId,
     mut command: std::process::Command,
 ) -> std::io::Result<Launched> {
     use std::io::Write;
@@ -168,7 +116,7 @@ pub struct Launched {
 #[cfg(all(feature = "door-serve", windows))]
 pub fn launch(
     grants: &crate::door::app_admission::AppRouteGrants,
-    app: &crate::door::app_admission::AppId,
+    app: &ostiary::app_admission::AppId,
     program: &str,
     args: &[String],
 ) -> std::io::Result<Launched> {
@@ -181,7 +129,7 @@ pub fn launch(
 #[cfg(all(feature = "door-serve", windows))]
 pub fn launch_command(
     grants: &crate::door::app_admission::AppRouteGrants,
-    app: &crate::door::app_admission::AppId,
+    app: &ostiary::app_admission::AppId,
     mut command: std::process::Command,
 ) -> std::io::Result<Launched> {
     use std::os::windows::io::AsRawHandle;
@@ -208,7 +156,8 @@ pub fn end_process(grants: &crate::door::app_admission::AppRouteGrants, process:
 #[cfg(all(test, feature = "door-serve", unix))]
 mod tests {
     use super::*;
-    use crate::door::app_admission::{AllowedAppRoutes, AppId, AppRouteGrants};
+    use crate::door::app_admission::{AllowedAppRoutes, AppRouteGrants};
+    use ostiary::app_admission::AppId;
 
     #[test]
     fn a_launched_process_reads_its_handle_once_from_the_named_descriptor() {
@@ -254,7 +203,8 @@ mod tests {
 #[cfg(all(test, feature = "door-serve", windows))]
 mod windows_tests {
     use super::*;
-    use crate::door::app_admission::{AllowedAppRoutes, AppId, AppRouteGrants};
+    use crate::door::app_admission::{AllowedAppRoutes, AppRouteGrants};
+    use ostiary::app_admission::AppId;
 
     #[test]
     fn a_launched_process_is_known_by_id_and_creation_time_until_it_ends() {

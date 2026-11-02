@@ -32,7 +32,7 @@ use personae::carry::{DeviceGrantSet, RemoteAuthRevocationOutcome};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::door::declaration::{AppAuthority, AuthorityRefusal, CustodyOperation, SaltSource};
+use ostiary::declaration::{AppAuthority, AuthorityRefusal, CustodyOperation, SaltSource};
 
 /// The resident route custody is served on.
 pub const CUSTODY_ROUTE: &str = "custody";
@@ -427,26 +427,27 @@ impl From<AuthorityRefusal> for CustodyRefusal {
     }
 }
 
-impl AppAuthority {
-    /// Whether this connection may make `call`: its operation, each epoch
-    /// derivation it asks for, and each salt it releases, attests or signs
-    /// with, declared and granted. The resident's floors (never the master,
-    /// its own special scopes) still apply after this.
-    pub fn admit_custody(&self, call: &CustodyCall) -> Result<(), CustodyRefusal> {
-        self.custody_operation(call.operation())?;
-        match call.unwrapped() {
+impl CustodyCall {
+    /// Whether `authority` lets this connection make this call: its
+    /// operation, each epoch derivation it asks for, and each salt it
+    /// releases, attests or signs with, declared and granted. The resident's
+    /// floors (never the master, its own special scopes) still apply after
+    /// this.
+    pub fn admitted_by(&self, authority: &AppAuthority) -> Result<(), CustodyRefusal> {
+        authority.custody_operation(self.operation())?;
+        match self.unwrapped() {
             CustodyCall::ReleaseEpochKeys { keys, .. } => {
                 for key in keys {
-                    self.epoch(&key.context, key.device_bound, key.public_only)?;
+                    authority.epoch(&key.context, key.device_bound, key.public_only)?;
                 }
             }
             CustodyCall::Release { source, salts } => {
                 for salt in salts {
-                    self.salt((*source).into(), salt, true)?;
+                    authority.salt((*source).into(), salt, true)?;
                 }
             }
             CustodyCall::Attest { source, salt } | CustodyCall::Sign { source, salt, .. } => {
-                self.salt((*source).into(), salt, false)?;
+                authority.salt((*source).into(), salt, false)?;
             }
             _ => {}
         }
@@ -552,6 +553,10 @@ mod b64_32_opt {
 mod tests {
     use super::*;
 
+    fn admit(authority: &AppAuthority, call: &CustodyCall) -> Result<(), CustodyRefusal> {
+        call.admitted_by(authority)
+    }
+
     #[test]
     fn a_call_and_its_answer_round_trip_as_json() {
         let call = CustodyCall::Release {
@@ -614,8 +619,8 @@ mod tests {
 
     #[test]
     fn a_declared_app_is_refused_what_it_did_not_declare_or_was_not_granted() {
-        use crate::door::app_admission::AppId;
-        use crate::door::declaration::{AppDeclaration, AppGrant, CustodyUse, EpochUse, NamePattern};
+        use ostiary::app_admission::AppId;
+        use ostiary::declaration::{AppDeclaration, AppGrant, CustodyUse, EpochUse, NamePattern};
         let declaration = AppDeclaration {
             custody: CustodyUse {
                 operations: [CustodyOperation::Status, CustodyOperation::ReleaseEpochKeys].into(),
@@ -633,30 +638,30 @@ mod tests {
             device_label: None,
             keys: vec![EpochKeyRequest::secret(context, false)],
         };
-        assert!(authority.admit_custody(&CustodyCall::Status).is_ok());
-        assert!(authority.admit_custody(&CustodyCall::AsProfile {
+        assert!(admit(&authority, &CustodyCall::Status).is_ok());
+        assert!(admit(&authority, &CustodyCall::AsProfile {
             profile: ProfileId("p".into()),
             inner: Box::new(CustodyCall::Status),
         }).is_ok());
-        assert!(authority.admit_custody(&release("app.vault")).is_ok());
-        assert!(matches!(authority.admit_custody(&CustodyCall::LockVault), Err(CustodyRefusal::Undeclared { .. })));
-        assert!(matches!(authority.admit_custody(&release("app.other")), Err(CustodyRefusal::Undeclared { .. })));
+        assert!(admit(&authority, &release("app.vault")).is_ok());
+        assert!(matches!(admit(&authority, &CustodyCall::LockVault), Err(CustodyRefusal::Undeclared { .. })));
+        assert!(matches!(admit(&authority, &release("app.other")), Err(CustodyRefusal::Undeclared { .. })));
         let mut salted = AppDeclaration::default();
         salted.custody.operations = [CustodyOperation::Release, CustodyOperation::Sign].into();
-        salted.custody.salts = vec![crate::door::declaration::SaltUse::persona(crate::door::declaration::SaltPattern::Prefix("app.place.".into()))];
+        salted.custody.salts = vec![ostiary::declaration::SaltUse::persona(ostiary::declaration::SaltPattern::Prefix("app.place.".into()))];
         let mut salt_grant = AppGrant::new(AppId::new("app"));
         salt_grant.custody.operations = salted.custody.operations.clone();
         salt_grant.custody.salts = salted.custody.salts.clone();
         let salted = AppAuthority::new(salted, salt_grant);
         let release = |salt: &[u8]| CustodyCall::Release { source: KeySource::Persona, salts: vec![b"app.place.a".to_vec(), salt.to_vec()] };
-        assert!(salted.admit_custody(&release(b"app.place.b")).is_ok());
-        assert!(matches!(salted.admit_custody(&release(b"other")), Err(CustodyRefusal::Undeclared { .. })), "every salt in a release is checked");
-        assert!(salted.admit_custody(&CustodyCall::Sign { source: KeySource::Persona, salt: b"app.place.a".to_vec(), message: vec![] }).is_ok());
+        assert!(admit(&salted, &release(b"app.place.b")).is_ok());
+        assert!(matches!(admit(&salted, &release(b"other")), Err(CustodyRefusal::Undeclared { .. })), "every salt in a release is checked");
+        assert!(admit(&salted, &CustodyCall::Sign { source: KeySource::Persona, salt: b"app.place.a".to_vec(), message: vec![] }).is_ok());
         assert!(matches!(
-            salted.admit_custody(&CustodyCall::Sign { source: KeySource::Wallet, salt: b"app.place.a".to_vec(), message: vec![] }),
+            admit(&salted, &CustodyCall::Sign { source: KeySource::Wallet, salt: b"app.place.a".to_vec(), message: vec![] }),
             Err(CustodyRefusal::Undeclared { .. })
         ));
-        let refusal = authority.admit_custody(&CustodyCall::Roster).unwrap_err();
+        let refusal = admit(&authority, &CustodyCall::Roster).unwrap_err();
         assert_eq!(refusal, CustodyRefusal::Undeclared { what: "the custody operation roster".into() });
         let text = serde_json::to_string(&refusal).unwrap();
         assert_eq!(serde_json::from_str::<CustodyRefusal>(&text).unwrap(), refusal);
@@ -666,9 +671,57 @@ mod tests {
     fn the_delegation_scope_prefix_is_insignes() {
         for domain in ["moot", "mere.knot", "mere.graphshell", ""] {
             assert_eq!(
-                crate::door::declaration::delegation_scope_prefix(domain),
+                ostiary::declaration::delegation_scope_prefix(domain),
                 insigne::delegation::delegation_signing_prefix(domain)
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    // Moved from the door envelope's tests (djinn-slimming S2): custody
+    // answers inside `ostiary::wire`'s envelope keep their wire shape.
+    use ostiary::wire::AppHostMessage;
+
+    #[test]
+    fn released_custody_answer_preserves_exact_wire_fixture() {
+        use crate::door::custody::{CustodyAnswer, CustodyRefusal};
+        type Outgoing = AppHostMessage<(), (), Result<CustodyAnswer, CustodyRefusal>>;
+        let answer = Outgoing::Answer {
+            id: 9,
+            answer: Ok(CustodyAnswer::Released {
+                master: [0x5a; 32],
+                keys: vec![],
+            }),
+        };
+        let fixture = r#"{"type":"answer","id":9,"answer":{"Ok":{"answer":"released","master":"WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo","keys":[]}}}"#;
+        assert_eq!(serde_json::to_string(&answer).unwrap(), fixture);
+        assert_eq!(serde_json::from_str::<Outgoing>(fixture).unwrap(), answer);
+    }
+
+    #[test]
+    fn released_answer_round_trips_nonempty_key_material() {
+        use crate::door::custody::{CustodyAnswer, CustodyRefusal, ReleasedKey};
+        use personae::IdentityProvider;
+        type Outgoing = AppHostMessage<(), (), Result<CustodyAnswer, CustodyRefusal>>;
+        let salt = b"test-release-key".to_vec();
+        let provider = personae::InMemoryProvider::from_seed([9; 32]);
+        let attestation = provider.attest_derived_key(&salt).unwrap();
+        let answer = Outgoing::Answer {
+            id: 9,
+            answer: Ok(CustodyAnswer::Released {
+                master: [0x5a; 32],
+                keys: vec![ReleasedKey {
+                    salt,
+                    seed: [0x6b; 32],
+                    attestation,
+                }],
+            }),
+        };
+        let encoded = serde_json::to_string(&answer).unwrap();
+        assert!(encoded.contains("WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo"));
+        assert!(encoded.contains("a2tra2tra2tra2tra2tra2tra2tra2tra2tra2tra2s"));
+        assert_eq!(serde_json::from_str::<Outgoing>(&encoded).unwrap(), answer);
     }
 }
