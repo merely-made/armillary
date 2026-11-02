@@ -1,6 +1,6 @@
 # Djinn slimming plan
 
-**Status:** 2026-11-01, S3 done (castellan-client in Dramatis); S4 next.
+**Status:** 2026-11-02, S4 under way (D18 to D21).
 Consumers outside Armillary and Dramatis still pin Djinn revisions from
 before the cut and move in S4. Findings were measured against Armillary `019d1e5` (Djinn's sources
 unchanged since `104b8d4`) and Mere `23bb596e2`.
@@ -179,6 +179,42 @@ runner.
   forbids Djinn, Armillary's serving crates, castellan and product crates.
 
   Links: plans djinn-slimming S3 · summary The custody fixtures and their check move to Dramatis with castellan-client.
+
+- **D18. Dramatis repins ostiary in step with the consumers (Mark,
+  2026-11-02):** "Bump Dramatis in step", over each consumer patching ostiary
+  (recommended). castellan-client pinned ostiary at Armillary `0ccfe7a`; the
+  consumers pin Djinn at `08ebbc4`, whose ostiary is byte-identical but a
+  different source, so a lock would hold two. Dramatis repins first, and the
+  consumers name the same revision. Until S5 publishes, an Armillary repin in
+  the consumers takes a Dramatis repin with it. Mere still lists ostiary in
+  its `[patch."…armillary.git"]` table, because that table moves every
+  Armillary crate to the `www.` source.
+
+  Links: plans djinn-slimming S4 · summary castellan-client's ostiary pin moves with the consumers' Armillary revision; Mere also patches ostiary.
+
+- **D19. M1's Mere branch merges as it is, S4 on top (Mark, 2026-11-02):**
+  "Merge it, S4 on top (Recommended)", over squashing M1 and S4 into one
+  commit. `m1/manifests` (`f427b6466`, three commits) still pins Djinn
+  `104b8d4`, so its commits do not build alone; Mere main builds at the
+  merge.
+
+  Links: plans djinn-slimming D14, S4 · summary S4's Mere change merges m1/manifests with its commits, then repoints.
+
+- **D20. S4 carries M1's Cleromancy branch too (Mark, 2026-11-02):** "S4
+  carries it too (Recommended)", over the M1 lane rebasing after S4.
+  `m1/declarations` (`e1da5b1`) declares Cleromancy's door routes, which a
+  resident under M1 requires, so it lands with Cleromancy's repoint, as D14
+  does for Mere.
+
+  Links: draws on mere:capability-door M1 · plans djinn-slimming S4 · summary Cleromancy's repoint merges m1/declarations in the same landing.
+
+- **D21. Knot drops Djinn (Mark, 2026-11-02):** "Drop Djinn entirely
+  (Recommended)", over keeping its `door-serve` dev-dependency. Knot names
+  nothing that stays in Djinn, so it depends on `ostiary` (`native`) and
+  `castellan-client` (`client`) alone. A test that needs the serving side
+  comes back as a fork.
+
+  Links: plans djinn-slimming S4 · summary knot-editor depends on ostiary and castellan-client, not Djinn.
 
 ## Open forks
 
@@ -426,6 +462,15 @@ breaking change lands in Knot first and is briefly red (lockstep rule).
 Cleromancy comes last. `graphshell-endpoint`'s `profile` feature depends on
 the custody crate; its projection features depend on the contract.
 
+Order, from the 2026-11-02 survey: Dramatis repins ostiary (D18); Knot drops
+Djinn (D21) and is red until Mere lands, by the lockstep procedure; Mere
+merges `m1/manifests` (D19), repoints and pins that Knot commit; Knot repins
+Mere. Cleromancy (with `m1/declarations`, D20) and isocosm follow Mere,
+because both reach Djinn through Mere crates as well (`mere-resident`,
+`mere-overmap`; `graphshell-host`'s `custody-client`). Cleromancy's tests
+still name `AllowedAppRoutes` and `AppRouteGrants`, so it keeps Djinn as a
+dev-dependency.
+
 - Done when:
   - every consumer in the table checks with its features on;
   - the fixtures' forbidden-API checks name the new crates;
@@ -456,3 +501,4 @@ the custody crate; its projection features depend on the contract.
 - 2026-11-01: S3 done: castellan-client in Dramatis, D15 to D17 answered.
 - 2026-11-02: S3 cross-checked on Linux and macOS; one macOS flake in
   Djinn's listener tests, untouched by S3.
+- 2026-11-02: S4 surveyed; D18 to D21 answered.
