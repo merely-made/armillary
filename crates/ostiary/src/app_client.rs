@@ -33,6 +33,9 @@ pub enum AppClientError {
     Closed,
     #[error("the resident host refused: {0}")]
     Refused(String),
+    /// The door refused the hello, with its typed reason.
+    #[error("the resident host refused the connection: {0}")]
+    Admission(crate::app_admission::AppAdmissionError),
     #[error("expected {expected}, the host answered with {got}")]
     UnexpectedAnswer {
         expected: &'static str,
@@ -138,6 +141,7 @@ impl AppConnection {
             .await?
             {
                 AppHostMessage::Challenge { challenge } => challenge,
+                AppHostMessage::Refused { refusal } => return Err(AppClientError::Admission(refusal)),
                 other => return Err(unexpected("a challenge", &other)),
             };
         let mut client_nonce = [0u8; 32];
@@ -280,6 +284,7 @@ fn unexpected<R, N, A>(expected: &'static str, got: &AppHostMessage<R, N, A>) ->
         AppHostMessage::Notice { .. } => "a carrier notice",
         AppHostMessage::Answer { .. } => "a custody answer",
         AppHostMessage::Failure { .. } => "a failure",
+        AppHostMessage::Refused { .. } => "a refusal",
     };
     AppClientError::UnexpectedAnswer { expected, got }
 }

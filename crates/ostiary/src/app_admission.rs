@@ -114,8 +114,10 @@ impl std::fmt::Display for AppId {
     }
 }
 
-/// Why a first-party connection was refused.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Why a first-party connection was refused. It crosses the wire as the
+/// host's refusal (capability door D24).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AppAdmissionError {
     /// The hello was not this endpoint's protocol.
     WrongSchema(String),
@@ -144,6 +146,12 @@ pub enum AppAdmissionError {
     IdentityMismatch { app: AppId, expected: String },
     /// The hello's launch handle was malformed.
     InvalidLaunch,
+    /// Nobody has granted this application; its declaration is put to the
+    /// owner, and it may retry once the owner has answered (D23).
+    AwaitingConsent(AppId),
+    /// The owner marks this application an agent, and the route is closed
+    /// to agents (D25).
+    ClosedToAgents { app: AppId, route: AppRouteId },
 }
 
 impl std::fmt::Display for AppAdmissionError {
@@ -186,6 +194,12 @@ impl std::fmt::Display for AppAdmissionError {
                 write!(f, "the peer is not {app}: the owner pinned it to {expected}")
             }
             Self::InvalidLaunch => f.write_str("the hello's launch handle is malformed"),
+            Self::AwaitingConsent(app) => {
+                write!(f, "nobody has granted {app}; its declaration is put to the owner")
+            }
+            Self::ClosedToAgents { app, route } => {
+                write!(f, "{route} is closed to agents, and the owner marks {app} an agent")
+            }
         }
     }
 }
@@ -421,6 +435,27 @@ fn unix_app_endpoint(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_refusal_crosses_the_wire_typed() {
+        for refusal in [
+            AppAdmissionError::AwaitingConsent(AppId::new("app")),
+            AppAdmissionError::ClosedToAgents {
+                app: AppId::new("mcp.agent"),
+                route: AppRouteId::new("retinue/radios").unwrap(),
+            },
+            AppAdmissionError::RouteUndeclared {
+                app: AppId::new("app"),
+                route: AppRouteId::new("custody").unwrap(),
+            },
+        ] {
+            let message = crate::wire::AppHostMessage::<(), (), ()>::Refused { refusal: refusal.clone() };
+            let text = serde_json::to_string(&message).unwrap();
+            let back: crate::wire::AppHostMessage<(), (), ()> = serde_json::from_str(&text).unwrap();
+            assert_eq!(back, message, "{text}");
+        }
+    }
+
     use super::*;
     use crate::declaration::AppGrant;
 

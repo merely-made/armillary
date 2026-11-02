@@ -170,6 +170,27 @@ impl CustodyIdentity {
         Self::connect_as_at_bounded(endpoint, app, None, profile, None)
     }
 
+    /// [`Self::connect_as`] carrying `declaration` on every conversation: an
+    /// application that speaks as a chosen persona and is admitted by its
+    /// declaration (capability door D22).
+    pub fn connect_declared_as(
+        app: &str,
+        declaration: AppDeclaration,
+        profile: Option<ProfileId>,
+    ) -> Result<Self, CustodyClientError> {
+        Self::connect_declared_as_at(&configured_app_endpoint(), app, declaration, profile)
+    }
+
+    /// [`Self::connect_declared_as`] at an explicit endpoint.
+    pub fn connect_declared_as_at(
+        endpoint: &str,
+        app: &str,
+        declaration: AppDeclaration,
+        profile: Option<ProfileId>,
+    ) -> Result<Self, CustodyClientError> {
+        Self::connect_as_at_bounded(endpoint, app, Some(declaration), profile, None)
+    }
+
     fn connect_as_at_bounded(
         endpoint: &str,
         app: &str,

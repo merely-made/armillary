@@ -14,7 +14,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ostiary::app_admission::{APP_IDENTITY_ROUTE, AppAdmissionError, AppId, AppRequest, AppRouteId, LaunchHandle};
-use ostiary::declaration::{AppAuthority, AppGrant};
+use ostiary::declaration::{AppAuthority, AppGrant, NamePattern};
 #[cfg(feature = "door-serve")]
 use ostiary::declaration::IdentityBasis;
 use ostiary::route::ResidentEndpointRoute;
@@ -36,6 +36,8 @@ pub struct AllowedAppRoutes {
     denied: BTreeSet<(AppId, AppRouteId)>,
     /// Owner grants for applications admitted by their declarations.
     grants: BTreeMap<AppId, AppGrant>,
+    /// Route namespaces closed to applications the owner marks agents (D25).
+    agents_closed: Vec<NamePattern>,
     /// Routes the host serves to declared applications whose grant names them.
     served: BTreeMap<AppRouteId, ResidentEndpointRoute>,
     /// Live launch handles, each naming the application Djinn launched with it.
@@ -94,6 +96,7 @@ impl AllowedAppRoutes {
             defaults: BTreeMap::new(),
             denied: BTreeSet::new(),
             grants: BTreeMap::new(),
+            agents_closed: Vec::new(),
             served: BTreeMap::new(),
             launches: BTreeMap::new(),
             #[cfg(feature = "door-serve")]
@@ -103,10 +106,9 @@ impl AllowedAppRoutes {
 
     /// Select the host-configured route granted to this request.
     ///
-    /// A request carrying a declaration is admitted only to a route it
-    /// declares and the policy permits. An application the owner grants by
-    /// declaration must declare; one without such a grant is admitted by its
-    /// label's route table, as before declarations.
+    /// A request is admitted only by its declaration, to a route it declares
+    /// and the policy permits; a hello that declares nothing is refused,
+    /// whatever its label (capability door D22, D24).
     pub fn admit(&self, request: &AppRequest) -> Result<ResidentEndpointRoute, AppAdmissionError> {
         match &request.declaration {
             Some(declaration) => {
@@ -120,10 +122,10 @@ impl AllowedAppRoutes {
                     });
                 }
             }
-            None if self.grants.contains_key(&request.app) => {
+            None if self.is_admitted(&request.app) => {
                 return Err(AppAdmissionError::DeclarationRequired(request.app.clone()));
             }
-            None => {}
+            None => return Err(AppAdmissionError::NotAllowed(request.app.clone())),
         }
         self.permits(&request.app, &request.route)
     }
@@ -144,6 +146,14 @@ impl AllowedAppRoutes {
         }
         if self.denied.contains(&(app.clone(), route.clone())) {
             return Err(AppAdmissionError::RouteDenied {
+                app: app.clone(),
+                route: route.clone(),
+            });
+        }
+        if grant.is_some_and(|grant| grant.agent)
+            && self.agents_closed.iter().any(|closed| closed.matches(route.as_str()))
+        {
+            return Err(AppAdmissionError::ClosedToAgents {
                 app: app.clone(),
                 route: route.clone(),
             });
@@ -284,6 +294,14 @@ impl AllowedAppRoutes {
         self.grants.get(app)
     }
 
+    /// Close every route `pattern` names to applications the owner marks
+    /// agents. Like a denial, this wins over every grant (D25).
+    pub fn close_to_agents(&mut self, pattern: NamePattern) {
+        if !self.agents_closed.contains(&pattern) {
+            self.agents_closed.push(pattern);
+        }
+    }
+
     /// Serve `route` to declared applications whose grant names it.
     pub fn serve(&mut self, route: ResidentEndpointRoute) {
         self.served
@@ -399,11 +417,65 @@ mod tests {
     use ostiary::app_admission::AppHello;
     use ostiary::declaration::AppDeclaration;
 
+    /// A declaration naming exactly `routes`.
+    fn declaring(routes: &[&str]) -> AppDeclaration {
+        AppDeclaration {
+            routes: routes.iter().map(|route| ostiary::declaration::NamePattern::exact(*route)).collect(),
+            ..AppDeclaration::default()
+        }
+    }
+
     #[test]
     fn app_ids_are_case_and_space_insensitive() {
         assert_eq!(AppId::new("  Turnstone "), AppId::new("turnstone"));
-        let request = AppHello::new(AppId::new("TURNSTONE")).accept().unwrap();
+        let request = AppHello::for_route(AppId::new("TURNSTONE"), AppRouteId::identity())
+            .declaring(declaring(&["identity"]))
+            .accept()
+            .unwrap();
         assert!(AllowedAppRoutes::identity_for(AppId::new("turnstone")).admit(&request).is_ok());
+    }
+
+    #[test]
+    fn a_hello_that_declares_nothing_is_refused_whatever_its_label() {
+        let grants = AllowedAppRoutes::identity_for(AppId::new("turnstone"));
+        let legacy = AppHello::new(AppId::new("turnstone")).accept().unwrap();
+        assert_eq!(
+            grants.admit(&legacy).unwrap_err(),
+            AppAdmissionError::DeclarationRequired(AppId::new("turnstone"))
+        );
+        let unknown = AppHello::new(AppId::new("woodshed")).accept().unwrap();
+        assert_eq!(
+            grants.admit(&unknown).unwrap_err(),
+            AppAdmissionError::NotAllowed(AppId::new("woodshed"))
+        );
+    }
+
+    #[test]
+    fn a_route_closed_to_agents_refuses_an_agent_whatever_it_is_granted() {
+        let retinue = ResidentEndpointRoute::new("retinue/radios", Duration::from_millis(50)).unwrap();
+        let mut grants = AllowedAppRoutes::none();
+        grants.serve(retinue);
+        grants.close_to_agents(ostiary::declaration::NamePattern::prefix("retinue/"));
+        for (app, agent) in [("mcp.agent", true), ("graphshell", false)] {
+            let mut grant = AppGrant::new(AppId::new(app));
+            grant.routes = vec![ostiary::declaration::NamePattern::prefix("retinue/")];
+            grant.agent = agent;
+            grants.grant_app(grant);
+        }
+        let request = |app: &str| {
+            AppHello::for_route(AppId::new(app), AppRouteId::new("retinue/radios").unwrap())
+                .declaring(declaring(&["retinue/radios"]))
+                .accept()
+                .unwrap()
+        };
+        assert_eq!(
+            grants.admit(&request("mcp.agent")).unwrap_err(),
+            AppAdmissionError::ClosedToAgents {
+                app: AppId::new("mcp.agent"),
+                route: AppRouteId::new("retinue/radios").unwrap(),
+            }
+        );
+        assert!(grants.admit(&request("graphshell")).is_ok(), "a granted application that is not an agent opens it");
     }
 
     #[test]
@@ -433,6 +505,7 @@ mod tests {
             hello.clone().accept().unwrap(),
             AppRequest::new(AppId::new("turnstone"), knot.clone())
         );
+        let hello = hello.declaring(declaring(&["knot"]));
         let grants = AllowedAppRoutes::new([(
             AppId::new("turnstone"),
             ResidentEndpointRoute::new("knot", Duration::from_millis(7)).unwrap(),
@@ -446,6 +519,7 @@ mod tests {
     fn an_ungranted_route_is_distinct_from_an_unknown_application() {
         let request =
             AppHello::for_route(AppId::new("turnstone"), AppRouteId::new("knot").unwrap())
+                .declaring(declaring(&["knot"]))
                 .accept()
                 .unwrap();
         assert_eq!(
@@ -673,6 +747,7 @@ mod tests {
             AppId::new("turnstone"),
             AppRouteId::new("mere/divination").unwrap(),
         )
+        .declaring(declaring(&["mere/divination"]))
         .accept()
         .unwrap();
         let before = grants.current();

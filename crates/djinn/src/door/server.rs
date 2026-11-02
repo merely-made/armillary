@@ -83,6 +83,15 @@ where
     Ok(AdmittedApp { app: request.app, route, peer, basis, authority })
 }
 
+/// Tell the client why its hello was refused, as a typed frame, before the
+/// stream ends (capability door D24). Only an admission refusal crosses; a
+/// transport or framing failure ends the stream as before.
+pub async fn refuse<W: AsyncWrite + Unpin>(writer: &mut W, error: &AppServerError) -> Result<(), AppServerError> {
+    let AppServerError::Admission(refusal) = error else { return Ok(()) };
+    write_native_message_async(writer, &AppHostMessage::<(), (), ()>::Refused { refusal: refusal.clone() }).await?;
+    Ok(())
+}
+
 /// Complete connect after the adapter has captured its per-session surface.
 pub async fn connect<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(reader: &mut R, writer: &mut W, app: &AppId) -> Result<Option<LocalLink>, AppServerError> {
     let challenge = BrowserChallenge::fresh();
@@ -110,12 +119,31 @@ mod tests {
             let link = connect(&mut r, &mut w, &admitted.app).await.unwrap().unwrap();
             (admitted, link)
         });
-        write_native_message_async(&mut client, &AppHello::for_route(AppId::new("fixture"), ostiary::app_admission::AppRouteId::new("custody").unwrap())).await.unwrap();
+        let declaration = ostiary::declaration::AppDeclaration { routes: vec![ostiary::declaration::NamePattern::exact("custody")], ..Default::default() };
+        write_native_message_async(&mut client, &AppHello::for_route(AppId::new("fixture"), ostiary::app_admission::AppRouteId::new("custody").unwrap()).declaring(declaration)).await.unwrap();
         let Some(AppHostMessage::<(), (), ()>::Challenge { challenge }) = read_native_message_async(&mut client).await.unwrap() else { panic!("challenge") };
         write_native_message_async(&mut client, &AppMessage::<(), ()>::Connect { schema: APP_CONNECT_SCHEMA.into(), host_nonce: challenge.host_nonce, client_nonce: base64::engine::general_purpose::URL_SAFE_NO_PAD.encode([3;32]) }).await.unwrap();
         let (admitted, link) = host.await.unwrap();
         assert_eq!(admitted.app.as_str(), "fixture");
         assert_eq!(admitted.route.id(), "custody");
         assert_eq!(link.client_nonce, [3;32]);
+    }
+
+    #[tokio::test]
+    async fn a_refused_hello_reaches_the_client_typed() {
+        let (mut client, server) = tokio::io::duplex(4096);
+        let host = tokio::spawn(async move {
+            let (mut r, mut w) = tokio::io::split(server);
+            let grants = AllowedAppRoutes::none();
+            let error = admit_from(&mut r, None, &grants, |request, grants| grants.admit(request)).await.err().expect("refused");
+            refuse(&mut w, &error).await.unwrap();
+        });
+        write_native_message_async(&mut client, &AppHello::for_route(AppId::new("woodshed"), ostiary::app_admission::AppRouteId::new("custody").unwrap())).await.unwrap();
+        let reply: Option<AppHostMessage<(), (), ()>> = read_native_message_async(&mut client).await.unwrap();
+        assert_eq!(
+            reply,
+            Some(AppHostMessage::Refused { refusal: AppAdmissionError::NotAllowed(AppId::new("woodshed")) })
+        );
+        host.await.unwrap();
     }
 }

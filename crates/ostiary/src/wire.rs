@@ -19,7 +19,7 @@
 use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-use crate::app_admission::AppId;
+use crate::app_admission::{AppAdmissionError, AppId};
 
 /// Schema of the connect answer an application sends.
 pub const APP_CONNECT_SCHEMA: &str = "mere.graphshell/app-connect/v1";
@@ -99,6 +99,10 @@ pub enum AppHostMessage<Response, Notice, Answer> {
     },
     Failure {
         message: String,
+    },
+    /// The hello was refused, and why; the stream ends after it (D24).
+    Refused {
+        refusal: AppAdmissionError,
     },
 }
 

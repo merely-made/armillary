@@ -282,6 +282,10 @@ pub struct CustodyUse {
     /// them. A released namespace may also be signed or attested with.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub acts: Vec<SaltUse>,
+    /// The scope its retained-content payloads are sealed under. The scope
+    /// is bound into every sealed payload, so it never changes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_scope: Option<String>,
 }
 
 impl CustodyUse {
@@ -290,6 +294,7 @@ impl CustodyUse {
             && self.epoch.is_empty()
             && self.salts.is_empty()
             && self.acts.is_empty()
+            && self.payload_scope.is_none()
     }
 }
 
@@ -350,6 +355,9 @@ impl AppDeclaration {
         for epoch in &self.custody.epoch {
             NamePattern::Exact(epoch.context.clone()).validate()?;
         }
+        if let Some(scope) = &self.custody.payload_scope {
+            NamePattern::Exact(scope.clone()).validate()?;
+        }
         self.custody
             .salts
             .iter()
@@ -372,6 +380,9 @@ pub struct CustodyGrant {
     pub salts: Vec<SaltUse>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub acts: Vec<SaltUse>,
+    /// The retained-content seal scope, as the application declared it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload_scope: Option<String>,
 }
 
 /// The OS identity an owner pins an application's label to, per platform.
@@ -461,6 +472,10 @@ pub struct AppGrant {
     /// The OS identity the label is pinned to; absent, development mode.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identity: Option<AppIdentity>,
+    /// The owner marks this application an agent: a route closed to agents
+    /// refuses it whatever else the grant names (capability door D25).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub agent: bool,
 }
 
 impl AppGrant {
@@ -470,6 +485,7 @@ impl AppGrant {
             routes: Vec::new(),
             custody: CustodyGrant::default(),
             identity: None,
+            agent: false,
         }
     }
 
@@ -494,6 +510,9 @@ impl AppGrant {
             .iter()
             .chain(&self.custody.epoch)
             .try_for_each(NamePattern::validate)?;
+        if let Some(scope) = &self.custody.payload_scope {
+            NamePattern::Exact(scope.clone()).validate()?;
+        }
         self.custody
             .salts
             .iter()
@@ -503,7 +522,8 @@ impl AppGrant {
 }
 
 /// Why a declaration or grant was rejected as malformed.
-#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
+#[serde(rename_all = "snake_case")]
 pub enum DeclarationError {
     #[error("a declared name is empty, too long or contains whitespace: {0:?}")]
     InvalidName(String),
@@ -604,6 +624,22 @@ impl AppAuthority {
         Ok(())
     }
 
+    /// The scope this connection's retained-content payloads are sealed
+    /// under: the one it declared, if the owner's grant names the same.
+    pub fn payload_scope(&self) -> Result<&str, AuthorityRefusal> {
+        let what = || "a retained-content seal scope".to_string();
+        let declared = self
+            .declaration
+            .custody
+            .payload_scope
+            .as_deref()
+            .ok_or_else(|| self.undeclared(what()))?;
+        match self.grant.custody.payload_scope.as_deref() {
+            Some(granted) if granted == declared => Ok(declared),
+            _ => Err(self.not_granted(format!("the seal scope {declared}"))),
+        }
+    }
+
     /// The offer this connection declared under `route`, if any. Whether
     /// the owner lets it serve that offer is the host's projection policy.
     pub fn offer(&self, route: &AppRouteId) -> Result<&OfferedProjection, AuthorityRefusal> {
@@ -656,7 +692,39 @@ mod tests {
                 ..CustodyGrant::default()
             },
             identity: None,
+            agent: false,
         }
+    }
+
+    #[test]
+    fn a_seal_scope_is_declared_and_pinned_by_the_grant() {
+        let mut declaration = declaration();
+        let mut grant = grant();
+        let unsealed = AppAuthority::new(declaration.clone(), grant.clone());
+        assert!(matches!(unsealed.payload_scope(), Err(AuthorityRefusal::Undeclared { .. })));
+        declaration.custody.payload_scope = Some("app.retained/custody-v1".into());
+        let ungranted = AppAuthority::new(declaration.clone(), grant.clone());
+        assert!(matches!(ungranted.payload_scope(), Err(AuthorityRefusal::NotGranted { .. })));
+        grant.custody.payload_scope = Some("app.other/custody-v1".into());
+        let other = AppAuthority::new(declaration.clone(), grant.clone());
+        assert!(
+            matches!(other.payload_scope(), Err(AuthorityRefusal::NotGranted { .. })),
+            "the grant pins the scope; a different one is not granted"
+        );
+        grant.custody.payload_scope = declaration.custody.payload_scope.clone();
+        let sealed = AppAuthority::new(declaration.clone(), grant.clone());
+        assert_eq!(sealed.payload_scope(), Ok("app.retained/custody-v1"));
+        declaration.custody.payload_scope = Some("has space".into());
+        assert!(declaration.validate().is_err());
+    }
+
+    #[test]
+    fn the_agent_mark_round_trips_and_is_absent_by_default() {
+        let mut grant = grant();
+        assert!(!serde_json::to_string(&grant).unwrap().contains("agent"));
+        grant.agent = true;
+        let text = serde_json::to_string(&grant).unwrap();
+        assert_eq!(serde_json::from_str::<AppGrant>(&text).unwrap(), grant);
     }
 
     #[test]
