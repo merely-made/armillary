@@ -312,9 +312,18 @@ listener, server, link, custody and `resident`, and depends on ostiary.
 - Fixtures: `support/fixtures/{portable,native}` became
   `support/fixtures/ostiary/`, and `support/fixtures/check.sh` runs all five,
   forbidding Dramatis, Armillary, peer-facts and Djinn in ostiary's cone.
-- Not checked: Linux and macOS targets. This machine has no Unix Rust target,
-  so the Unix-only paths (the launcher's `ostiary::launch` imports, the
-  `inherited` read and the Unix dialer) compiled only on Windows.
+- Linux and macOS (2026-11-01, `bc12b23` cloned fresh, rustc 1.99.1): on
+  Fedora 44 (T-PC) and macOS 15.8.1 Intel (Q-PC), every Djinn feature and
+  ostiary's portable tier check, with no warnings beyond the workspace's
+  `unsafe_code` lint on moved code and one existing deprecation. Ostiary's
+  35 tests pass on both. Djinn's 59 pass on Linux. On macOS, the first full
+  run failed one test, `launch::tests::a_launched_process_reads_its_handle_once_from_the_named_descriptor`
+  (the child exited non-zero), and the next eight full runs passed. Eight
+  full runs of the pre-cut tree (`1145443`, 92 tests) also passed, so 1 in 17
+  after the cut against 0 in 8 before, on a host at load 11 to 14. S2
+  changed only that test's imports. A suspect, not proven: `launch_command`
+  opens its pipe without close-on-exec, so a child spawned concurrently by
+  another test inherits its descriptors.
 
 
 The contract crate is a new Armillary workspace member. It holds `wire`,
@@ -366,7 +375,9 @@ the custody crate; its projection features depend on the contract.
   - every consumer in the table checks with its features on;
   - the fixtures' forbidden-API checks name the new crates;
   - each lock holds one copy of the contract, Djinn and the custody crate;
-  - the Mere lock's unused-patch warnings match the base revision.
+  - the Mere lock's unused-patch warnings match the base revision;
+  - the M1 lane is told when S4 is on Mere main, naming the new forms of
+    `connect_declared_as` and `open_declared_route` if S4 renames them (D14).
 
 ### S5. Publish and resume
 
