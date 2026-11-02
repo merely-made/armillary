@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # The door contract (ostiary) and Djinn, each fixture one feature tier.
+# castellan-client's fixtures live in Dramatis.
 cd "$(dirname "$0")"
 metadata_dir="${DJINN_METADATA_DIR:-${TMPDIR:-/tmp}/djinn-fixture-metadata}"
 mkdir -p "$metadata_dir"
-for fixture in ostiary/portable ostiary/native djinn/custody-types djinn/custody djinn/resident; do
+for fixture in ostiary/portable ostiary/native djinn/resident; do
   echo "Fixture: $fixture"
   crate="${fixture%%/*}"
   name="${fixture//\//-}"
@@ -38,7 +39,6 @@ PYCODE
     logfile="$metadata_dir/$name-forbidden.log"
     case "$fixture" in
       ostiary/portable|ostiary/native) symbol=custody ;;
-      djinn/custody-types) symbol=custody_client ;;
       djinn/resident) symbol=door ;;
       *) echo "Unknown forbidden fixture: $fixture"; exit 1 ;;
     esac

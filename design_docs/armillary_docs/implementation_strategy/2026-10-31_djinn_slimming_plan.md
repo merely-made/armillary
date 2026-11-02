@@ -1,8 +1,8 @@
 # Djinn slimming plan
 
-**Status:** 2026-11-01, S2 done (ostiary in Armillary); S3 next. Consumers
-outside Armillary still pin Djinn revisions from before the cut and move in
-S4. Findings were measured against Armillary `019d1e5` (Djinn's sources
+**Status:** 2026-11-01, S3 done (castellan-client in Dramatis); S4 next.
+Consumers outside Armillary and Dramatis still pin Djinn revisions from
+before the cut and move in S4. Findings were measured against Armillary `019d1e5` (Djinn's sources
 unchanged since `104b8d4`) and Mere `23bb596e2`.
 
 **For:** Mere's distillery extraction D18 ("Publish the djinn chain, but also,
@@ -156,6 +156,29 @@ runner.
   refuses undeclared hellos, the repin changes behaviour as well as paths.
 
   Links: draws on mere:capability-door M1 · plans djinn-slimming S3, S4 · summary M1's Armillary commit lands before S3; S4's Mere repin carries M1's Mere branch in one change.
+
+- **D15. castellan-client's types are its default; `client` adds the clients
+  (Mark, 2026-11-01):** "Types default, `client` feature (Recommended)", over
+  no features or Djinn's feature names. Djinn's `custody` becomes
+  castellan-client's default features and `custody-client` becomes `client`,
+  which keeps the custody-types fixture's split.
+
+  Links: plans djinn-slimming S3, S4 · summary castellan-client defaults to the custody types; its client feature adds the clients.
+
+- **D16. castellan-client keeps the module names, flat (Mark, 2026-11-01):**
+  "Same names, flat (Recommended)", over dropping the `custody_` prefix, as
+  D11 did for ostiary: `castellan_client::{custody, custody_client,
+  custody_identity, custody_payload, quarantine}`.
+
+  Links: plans djinn-slimming S3, S4 · summary castellan-client's modules keep Djinn's custody module names.
+
+- **D17. The custody fixtures move to Dramatis (Mark, 2026-11-01):** "Move to
+  Dramatis (Recommended)", over dropping them. Armillary's
+  `support/fixtures/djinn/{custody-types,custody}` became Dramatis's
+  `support/fixtures/castellan-client/{types,client}`, with a check script that
+  forbids Djinn, Armillary's serving crates, castellan and product crates.
+
+  Links: plans djinn-slimming S3 · summary The custody fixtures and their check move to Dramatis with castellan-client.
 
 ## Open forks
 
@@ -348,7 +371,24 @@ launcher, the grant logic, the listener and `resident`.
 
 ### S3. The custody crate (Dramatis)
 
-Starts once capability-door M1's Armillary commit is on main (D14).
+Done 2026-11-01, after M1 landed (D14). Dramatis's
+`crates/castellan-client` holds `custody`, `custody_payload` and
+`quarantine` by default and `custody_client` and `custody_identity` under
+`client` (D15, D16), over `ostiary` pinned to Armillary `0ccfe7a`. Djinn's
+`custody` and `custody-client` features and its Dramatis, eidetic and uuid
+dependencies are gone.
+- Tests: Djinn had 52 on Windows with all features at `0ccfe7a`. The 22
+  custody tests pass in castellan-client under the same names, and Djinn's
+  remaining 30 pass.
+- `cargo tree -p djinn --all-features` names no `dramatis`, `chatelaine`,
+  `insigne`, `personae` or `eidetic`, and Armillary's lock lists none of them.
+- Dramatis's lock holds one copy of each family crate, and `cargo deny check
+  bans` passes. castellan-client is empty on `wasm32-unknown-unknown`.
+- Fixtures (D17): `support/fixtures/castellan-client/check.sh` passes for
+  `types` (117 packages) and `client` (128); the types fixture cannot name
+  `custody_client`. Armillary's `check.sh` passes its remaining three.
+- The Dramatis repo plan has its DR-C line.
+
 
 The new Dramatis crate holds `custody`, `custody_client`, `custody_identity`,
 `custody_payload` and `quarantine`, plus the custody-payload tests from
@@ -398,3 +438,4 @@ the custody crate; its projection features depend on the contract.
   both names still free (S1); D8 and D9 answered, closing F1 and F3.
 - 2026-11-01: S2 done: ostiary cut, D10 to D13 answered on the way.
 - 2026-11-01: D14 orders M1 before S3 and folds M1's Mere side into S4.
+- 2026-11-01: S3 done: castellan-client in Dramatis, D15 to D17 answered.

@@ -1,2 +1,4 @@
 /target/
+# Fixture workspaces build beside themselves (build-dir is per workspace).
+/support/fixtures/**/target/
 /.cargo/config.local.toml

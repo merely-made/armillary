@@ -3,9 +3,9 @@
 Djinn serves the application door and provides resident lifetime mechanics.
 The door's contract, what applications speak, is [`ostiary`](../ostiary):
 the hello and admission types, declarations, framing, envelopes and the
-native client. Hosts supply route policy, application services and custody
-authority. Identity domain types belong to Dramatis and Personae; custody
-wire operations do not themselves grant authority.
+native client. The custody route's application side, its calls and clients,
+is Dramatis's `castellan-client`. Hosts supply route policy, application
+services and custody authority.
 
 Default features are empty. Native APIs are available on Unix and Windows and
 are gated out on Wasm.
@@ -13,14 +13,10 @@ are gated out on Wasm.
 | Feature | API | Native | Wasm |
 | --- | --- | --- | --- |
 | `door` | Owner grants and route policy (`AllowedAppRoutes`, `AppRouteGrants`) over `ostiary` | Yes | Yes |
-| `door-native` | `ostiary`'s native client, for the custody clients | Yes | Gated out |
+| `door-native` | `ostiary`'s native client | Yes | Gated out |
 | `door-serve` | Listener, launcher, shared handshake and link binding | Yes | Gated out |
-| `custody` | Custody, payload and quarantine types | Yes | Gated out |
-| `custody-client` | Custody and identity clients | Yes | Gated out |
 | `resident` | Task and shutdown orchestration | Yes | Gated out |
 
-`custody-client` adds the client side of the protected
-custody boundary; the host retains custody dispatch, grants and secrets.
 `resident` orchestrates supplied services and shutdown actions, while the host
 chooses those services and their policy.
 

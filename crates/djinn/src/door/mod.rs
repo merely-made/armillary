@@ -5,28 +5,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //! The serving side of the application door: the owner's grants, the
-//! launcher, the listener and the server, plus the custody clients. The
-//! contract applications speak is `ostiary`.
+//! launcher, the listener and the server. The contract applications speak
+//! is `ostiary`; the custody clients are Dramatis's `castellan-client`.
 
 pub mod app_admission;
-#[cfg(all(feature = "custody", any(unix, windows), not(target_arch = "wasm32")))]
-pub mod custody;
-#[cfg(all(
-    feature = "custody-client",
-    any(unix, windows),
-    not(target_arch = "wasm32")
-))]
-pub mod custody_client;
-#[cfg(all(
-    feature = "custody-client",
-    any(unix, windows),
-    not(target_arch = "wasm32")
-))]
-pub mod custody_identity;
-#[cfg(all(feature = "custody", any(unix, windows), not(target_arch = "wasm32")))]
-pub mod custody_payload;
-#[cfg(all(feature = "custody", any(unix, windows), not(target_arch = "wasm32")))]
-pub mod quarantine;
 
 #[cfg(all(feature = "door-serve", any(unix, windows), not(target_arch = "wasm32")))]
 pub mod launch;

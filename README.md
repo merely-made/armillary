@@ -37,8 +37,7 @@ without opening resources. This gate adds no worker pool, renderer, transport
 or product identity types. Once-only resource initialization can use the
 standard library's `LazyLock` directly.
 
-Djinn owns the finite application door, selected native custody clients, and
-resident service/task lifetimes; `ostiary` is the door's contract, which
+Djinn owns the finite application door and resident service/task lifetimes; `ostiary` is the door's contract, which
 applications depend on instead of Djinn. Mere supplies concrete product composition in
 `mere-resident`, retaining the `djinn` executable names. Armillary itself has no
 Djinn or product dependency. See [Djinn features and authority boundaries](crates/djinn/README.md)
