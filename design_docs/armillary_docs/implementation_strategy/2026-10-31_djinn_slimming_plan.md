@@ -1,6 +1,6 @@
 # Djinn slimming plan
 
-**Status:** 2026-11-02, S4 done (D18 to D22); S5 next.
+**Status:** 2026-11-02, S4 done (D18 to D22); S5 half done (D23, D24): the Armillary and Dramatis crates are published, Mere's chain waits on Mark.
 Consumers outside Armillary and Dramatis still pin Djinn revisions from
 before the cut and move in S4. Findings were measured against Armillary `019d1e5` (Djinn's sources
 unchanged since `104b8d4`) and Mere `23bb596e2`.
@@ -228,6 +228,23 @@ runner.
   D30).
 
   Links: amends djinn-slimming D14 · draws on mere:capability-door D30 · summary Retained content seals under the declared, granted scope, falling back to the label's; the M1 lane removes the fallback.
+
+- **D23. Dramatis releases personae 0.3.1 and dramatis 0.0.4 first (Mark,
+  2026-11-02):** "personae 0.3.1, dramatis 0.0.4 (Recommended)", over 0.4.0 and
+  0.1.0 or stopping at ostiary and peer-facts. castellan-client uses
+  `personae::carry::RemoteAuthRevocationOutcome` and `dramatis::authentication`,
+  which the published 0.3.0 and 0.0.3 lack; the repo's changes are additive.
+  The drift check also found `insigne` 0.0.2 and `chatelaine` 0.0.3 identical
+  to their published crates.
+
+  Links: plans djinn-slimming S5 · summary personae 0.3.1 and dramatis 0.0.4 release the additive Dramatis changes castellan-client needs.
+
+- **D24. Armillary 0.1.2, then Djinn (Mark, 2026-11-02):** "Publish armillary
+  0.1.2, then Djinn", over deferring Djinn. Djinn's `resident` and `door-serve`
+  need armillary's `tokio` feature, which 0.1.1 lacks; the repo's changes since
+  (the `demand` module, `actor`, `boundary`) are additive.
+
+  Links: plans djinn-slimming S5 · summary armillary 0.1.2 releases the additive actor changes so Djinn 0.0.3 can publish.
 
 ## Open forks
 
@@ -521,6 +538,25 @@ dev-dependency.
 
 ### S5. Publish and resume
 
+Half done 2026-11-02. Published, each after a registry dry-run and a name
+recheck (D7): `ostiary` 0.0.1, `peer-facts` 0.0.1, `personae` 0.3.1,
+`dramatis` 0.0.4 (D23), `castellan-client` 0.0.1 (both feature sets verified
+against the registry), `armillary` 0.1.2 and `djinn` 0.0.3 (D24), then
+`script-wire` 0.0.1 and `script-witgen` 0.0.1 (their `publish = false` guard
+removed, since `graphshell-endpoint`'s optional `wit` dependencies must be on
+the registry). Armillary `0b05362`, Dramatis `7308142`, Mere `5f618efaf` and
+`db4a8d447` (Mere's `dramatis` and `personae` rows follow the releases).
+- Open, with Mere's chain: `graphshell-endpoint` 0.0.3 verifies for
+  `projection` (chirograph 0.0.3 is enough) but its `wit` feature's build
+  script reads `../../script/wit/world.wit`, a file outside the package, so the
+  published crate cannot build that feature. Its `profile` feature now builds
+  once Mere's `dramatis` row is 0.0.4. `workbench` 0.1.1, `incipit` 0.2.1 and
+  `scenograph` 0.0.6 dry-run clean; `scenomise` 0.0.7, `mere-surface-api` 0.1.1
+  and `cambium` 0.6.1 cannot dry-run until their predecessors are uploaded.
+  The batch upload was held back (an unattended loop of six publishes).
+- Consumers lock Dramatis and Armillary by revision, so none moves until its
+  next update; `dramatis` rows reading 0.0.3 then need 0.0.4.
+
 - Done when:
   - published, in order: `ostiary`, `castellan-client` (after the Dramatis
     drift check), `peer-facts` and Djinn, each name rechecked just before
@@ -543,3 +579,4 @@ dev-dependency.
   Djinn's listener tests, untouched by S3.
 - 2026-11-02: S4 surveyed; D18 to D21 answered, then D22 (the seal scope).
 - 2026-11-02: S4 done: Dramatis, Knot, Mere, Cleromancy and isocosm landed.
+- 2026-11-02: S5 half done: nine crates published; D23 and D24 answered; Mere's chain held at the `wit` build script.
