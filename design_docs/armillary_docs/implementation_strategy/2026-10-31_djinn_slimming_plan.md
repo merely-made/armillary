@@ -20,8 +20,11 @@ runner.
   move to their producers in the next plan, under the producer/host/runner
   survey (`mere:distillery-extraction` D10) and the store-lifetime fork
   (`mere:distillery-extraction` F1).
-- Castellan, the custodian and `custody-wire` stay in Mere (Dramatis repo
-  plan D6). This plan moves the application side of the custody route only.
+- The custodian and `custody-wire` stay in Mere. Castellan stayed in Mere here
+  (the archived Dramatis plan's ruling D6, 2026-10-06) and moved to Dramatis on
+  2026-11-03 (its current repo plan, D11 to D13), with the pandect wallet store as
+  `sporran` and gazette's directory domain. This plan moves the application side
+  of the custody route only.
 - WIT contracts and OS channels (capability door C0, D1, D3).
 
 ## Decisions
@@ -78,7 +81,8 @@ runner.
   ours. Put back with that finding, he chose "castellan-client
   (Recommended)", over `suppliant`, `claviger` and `petitioner`. The client is
   the app's side of Castellan's "gate petition". It lives in Dramatis, and
-  Castellan stays in Mere (Dramatis D6).
+  Castellan stayed in Mere (the archived Dramatis plan's D6) until it moved there
+  too on 2026-11-03.
 
   Links: plans djinn-slimming D2 · summary The custody client crate is named castellan-client, the petitioning side of Castellan.
 
