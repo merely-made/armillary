@@ -1,6 +1,6 @@
 # Djinn slimming plan
 
-**Status:** 2026-11-02, S4 done (D18 to D22); S5 half done (D23, D24): the Armillary and Dramatis crates are published, Mere's chain waits on Mark.
+**Status:** 2026-11-02, S4 and S5 done (D18 to D24) except `cambium` 0.6.1, which waits on `genet-events`.
 Consumers outside Armillary and Dramatis still pin Djinn revisions from
 before the cut and move in S4. Findings were measured against Armillary `019d1e5` (Djinn's sources
 unchanged since `104b8d4`) and Mere `23bb596e2`.
@@ -538,33 +538,26 @@ dev-dependency.
 
 ### S5. Publish and resume
 
-Half done 2026-11-02. Published, each after a registry dry-run and a name
-recheck (D7): `ostiary` 0.0.1, `peer-facts` 0.0.1, `personae` 0.3.1,
-`dramatis` 0.0.4 (D23), `castellan-client` 0.0.1 (both feature sets verified
-against the registry), `armillary` 0.1.2 and `djinn` 0.0.3 (D24), then
-`script-wire` 0.0.1 and `script-witgen` 0.0.1 (their `publish = false` guard
-removed, since `graphshell-endpoint`'s optional `wit` dependencies must be on
-the registry). Armillary `0b05362`, Dramatis `7308142`, Mere `5f618efaf` and
-`db4a8d447` (Mere's `dramatis` and `personae` rows follow the releases).
-- Open, with Mere's chain: `graphshell-endpoint` 0.0.3 verifies for
-  `projection` (chirograph 0.0.3 is enough) but its `wit` feature's build
-  script reads `../../script/wit/world.wit`, a file outside the package, so the
-  published crate cannot build that feature. Its `profile` feature now builds
-  once Mere's `dramatis` row is 0.0.4. `workbench` 0.1.1, `incipit` 0.2.1 and
-  `scenograph` 0.0.6 dry-run clean; `scenomise` 0.0.7, `mere-surface-api` 0.1.1
-  and `cambium` 0.6.1 cannot dry-run until their predecessors are uploaded.
-  The batch upload was held back (an unattended loop of six publishes).
-- Consumers lock Dramatis and Armillary by revision, so none moves until its
-  next update; `dramatis` rows reading 0.0.3 then need 0.0.4.
-
-- Done when:
-  - published, in order: `ostiary`, `castellan-client` (after the Dramatis
-    drift check), `peer-facts` and Djinn, each name rechecked just before
-    its upload (D7);
-  - `mere:distillery-extraction` D17 resumes: `graphshell-endpoint` 0.0.3
-    and the crates behind it are published, now including `script-wire`,
-    `script-witgen` and a `chirograph` bump past 0.0.3 (S0 findings);
-  - `mere:distillery-extraction` F4 is closed, citing this plan.
+Done 2026-11-02 except `cambium`. Published, each after a registry dry-run and a name
+recheck (D7): `ostiary` 0.0.1, `peer-facts` 0.0.1, `personae` 0.3.1, `dramatis` 0.0.4
+(D23), `castellan-client` 0.0.1 (both feature sets verified against the registry),
+`armillary` 0.1.2 and `djinn` 0.0.3 (D24), then Mere's chain: `script-wire` 0.0.1 and
+`script-witgen` 0.0.1 (their `publish = false` removed, since `graphshell-endpoint`'s
+optional `wit` dependencies must be on the registry), `chirograph` 0.0.4 (the `wit`
+feature needs `CarrierError::Lapsed`; Knot's requirement moved first, `62aff7b`),
+`graphshell-endpoint` 0.0.3 (every feature verified; its `wit/world.wit` is a copy of
+the workspace's, held equal by `tests/wit_copy.rs`), `workbench` 0.1.1, `incipit` 0.2.1,
+`scenograph` 0.0.6, `scenomise` 0.0.7 and `mere-surface-api` 0.1.1.
+- Commits: Armillary `0b05362`, Dramatis `7308142`, Mere `5f618efaf`, `db4a8d447`,
+  `6576edf7f`, `328709104`, Knot `62aff7b`.
+- Not published: `cambium` 0.6.1. Genet commit `43d13ce56` made it depend on
+  `genet-events`, which Genet keeps at 0.0.0 with `publish = false`; a crate with a
+  dependency off the registry cannot package. Publishing `genet-events` is a Genet-repo
+  change.
+- Consumers lock Dramatis, Armillary and Mere by revision, so none moves until its next
+  update; then `dramatis` rows reading 0.0.3 need 0.0.4 and Knot's `chirograph` row is
+  already 0.0.4.
+- `mere:distillery-extraction` D17 resumed and F4 closed in Mere's plan.
 
 ## Progress
 
@@ -579,4 +572,4 @@ the registry). Armillary `0b05362`, Dramatis `7308142`, Mere `5f618efaf` and
   Djinn's listener tests, untouched by S3.
 - 2026-11-02: S4 surveyed; D18 to D21 answered, then D22 (the seal scope).
 - 2026-11-02: S4 done: Dramatis, Knot, Mere, Cleromancy and isocosm landed.
-- 2026-11-02: S5 half done: nine crates published; D23 and D24 answered; Mere's chain held at the `wit` build script.
+- 2026-11-02: S5 done: seventeen crates published; D23 and D24 answered; cambium 0.6.1 waits on genet-events; F4 closed.
