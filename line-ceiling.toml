@@ -1,0 +1,17 @@
+ceiling = 600
+
+[[exception]]
+path = "crates/djinn/src/door/app_admission.rs"
+reason = "Application-route grants, pinned-label admission and their refusal fixtures share the door's private grant state; a split must preserve the admission boundary."
+
+[[exception]]
+path = "crates/djinn/src/door/local_endpoint.rs"
+reason = "The owner-only local endpoint combines platform listener ownership and peer admission; preserve its Unix/Windows transport boundary when splitting."
+
+[[exception]]
+path = "crates/ostiary/src/declaration.rs"
+reason = "Application declarations and owner permissions share wire types and validation fixtures; preserve the distinction between declaration and grant when splitting."
+
+[[exception]]
+path = "crates/peer-facts/src/lib.rs"
+reason = "The OS peer-observation contract combines Unix credentials and Windows token/process identity; preserve independent observed facts and platform checks when splitting."
