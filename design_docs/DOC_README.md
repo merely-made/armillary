@@ -19,13 +19,13 @@ Product resource initialization uses standard `LazyLock`; policy stays with host
 - [Djinn ownership extraction](armillary_docs/implementation_strategy/2026-10-30_djinn_ownership.md): independent application door and resident lifetimes, immediate receiver migration and qualification.
 - [Djinn slimming](armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md): the custody half leaves for Dramatis and a door contract crate leaves for producers, so Djinn keeps the serving half; waits for capability-door I1.
 
-- [Source splits](armillary_docs/implementation_strategy/2026-11-03_source_splits_plan.md): qualified declaration-authority and OS-observation splits within their existing crates; two source-size exceptions retired.
+- [Source splits](armillary_docs/implementation_strategy/2026-11-03_source_splits_plan.md): qualified declaration/authority, peer-observation, application-identity and platform-listener modules; all four source-size exceptions retired.
 
 ## Working principles
 
 - **Door feature qualification (2026-11-03):** the default workspace gate
   does not select Djinn's `door-serve` consumer. A change to the door
-  contract or peer observations also runs the native all-feature consumer
+  contract, listener enforcement or peer observations also runs the native all-feature consumer
   tests and the portable contract check; record which OS branches executed.
   The [source splits plan](armillary_docs/implementation_strategy/2026-11-03_source_splits_plan.md)
   carries this pass's scope and evidence.

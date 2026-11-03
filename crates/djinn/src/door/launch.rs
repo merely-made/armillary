@@ -9,7 +9,7 @@
 //!
 //! Linux has no code signature to read from a peer, so Djinn starts the
 //! application itself and hands it a one-time [`LaunchHandle`] on descriptor
-//! [`LAUNCH_FD`], which the child claims through `ostiary::launch`. The door
+//! [`ostiary::launch::LAUNCH_FD`], which the child claims through `ostiary::launch`. The door
 //! admits the label while the handle is live for that application.
 //!
 //! Windows needs no secret (capability door plan, D11). Djinn holds the

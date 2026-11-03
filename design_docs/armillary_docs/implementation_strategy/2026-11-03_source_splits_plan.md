@@ -1,7 +1,7 @@
 # Source splits plan
 
-**Status (2026-11-03):** landed. S1-S3 complete. Two ceiling exceptions retired.
-**Scope:** Ostiary declarations and OS peer facts, following Mere stack.7.
+**Status (2026-11-03):** landed. S1-S5 complete. All four Armillary ceiling exceptions retired.
+**Scope:** Ostiary declarations, OS peer facts and Djinn door admission/listeners, following Mere stack.7.
 Keep public entry points, wire formats, authority rules and crate features.
 This pass changes module ownership inside the existing crates.
 
@@ -23,6 +23,19 @@ This pass changes module ownership inside the existing crates.
   decisions from staged source records, then commit and push main.
   Done when the receipt states the verified platform scope and the two
   exceptions have been retired without replacement exemptions.
+
+- **S4. Application policy and identity.** Keep the route admission policy
+  and shared policy snapshots in `door::app_admission`; isolate live launch
+  tracking and OS identity decisions in a private child implementation.
+  Preserve public method paths, refusal order and existing tests.
+  Done when every resulting file is below the ceiling, native door tests
+  pass and the app-admission exception is retired.
+- **S5. Platform listener enforcement.** Keep `LocalListener` and the common
+  serving surface in `door::local_endpoint`; group Windows pipe security
+  and Unix socket ownership/probing with their own regression fixtures.
+  Done when platform bodies and public paths are preserved, relevant native
+  and portable gates pass, the endpoint exception is retired and Armillary
+  has no source-size exception left. Record executed OS scope in the receipt.
 
 ## Decisions
 
@@ -62,3 +75,22 @@ and stack.7. Platform acceptance remains with its original owner plans.
   source files are below 600 lines. Both obsolete exceptions are retired;
   Armillary retains only its two Djinn server-file exceptions. Publication
   is the commit carrying this source record and its appended receipt.
+- 2026-11-03: Mark requested more splits. S4-S5 extend the same plan to
+  the two remaining exceptions. The pre-edit native Djinn baseline passes
+  all 30 tests. The admission file combines route policy, live identity
+  tracking and shared updates; the listener embeds separable platform
+  implementations and their security/probe fixtures.
+- 2026-11-03: S4 isolates launch/OS identity methods while retaining the
+  `AllowedAppRoutes` state and public method paths. S5 groups each platform's
+  listener loop, owner checks and probe/ACL fixtures in a private module.
+  Existing test function names and assertions remain; platform fixtures now
+  sit below their implementation module. The same 30 native Djinn tests,
+  120 workspace tests and one doctest pass. The portable `door` feature
+  compiles independently on wasm. The final local gate is next.
+- 2026-11-03: S4-S5 landed with every resulting file below the ceiling
+  and no exception left in Armillary. Native all-feature Clippy, the full
+  local gate, Windows tests and portable wasm qualification pass. Public
+  documentation also passes after qualifying an existing Unix-only import's
+  `LAUNCH_FD` link to its portable Ostiary home. The change is doc-only;
+  launcher behavior is unchanged. The receipt appends the platform limits
+  and complete results for this continuation.
