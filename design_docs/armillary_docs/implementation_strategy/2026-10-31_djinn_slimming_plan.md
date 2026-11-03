@@ -572,4 +572,4 @@ the workspace's, held equal by `tests/wit_copy.rs`), `workbench` 0.1.1, `incipit
   Djinn's listener tests, untouched by S3.
 - 2026-11-02: S4 surveyed; D18 to D21 answered, then D22 (the seal scope).
 - 2026-11-02: S4 done: Dramatis, Knot, Mere, Cleromancy and isocosm landed.
-- 2026-11-02: S5 done: seventeen crates published; D23 and D24 answered; cambium 0.6.1 waits on genet-events; F4 closed.
+- 2026-11-02: S5 done: sixteen crates published; D23 and D24 answered; cambium 0.6.1 waits on genet-events; F4 closed.
