@@ -1,7 +1,7 @@
 [package]
 rust-version = "1.97.1"
 name = "armillary"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "A host-neutral actor-kernel runtime: a !Send host-kernel boundary, a Send actor harness (thread-per-actor or pooled), generation counters for backpressure, and a growable reusing worker pool. GPUI's kernel/actor discipline made structural."
 repository = "https://github.com/merely-made/armillary"
