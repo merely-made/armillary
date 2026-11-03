@@ -10,6 +10,7 @@
 //! and a launched application's handle. Djinn serves the other side.
 
 pub mod app_admission;
+pub mod channel;
 pub mod declaration;
 pub mod frame;
 pub mod route;

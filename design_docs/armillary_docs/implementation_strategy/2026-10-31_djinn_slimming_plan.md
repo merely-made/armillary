@@ -561,6 +561,10 @@ and it is 0.0.1 because the event-dispatch API is unsettled).
 
 ## Progress
 
+- 2026-11-02: ported device-pairing D9/D11's channel opening exchange from `door/channel-route` into Ostiary after S2's
+  extraction. The admitted session's opening call and answer precede raw bytes; Djinn continues to re-export the door
+  contract. This unblocks D3's consumer repin onto the slimmed packages without restoring the custody dependency in Djinn.
+
 - 2026-10-31: plan written; D1 to D4 answered.
 - 2026-11-01: naming round, D5 to D7; F2 closed.
 - 2026-11-01: S0 done. I1's additions placed, two missed consumers added,
