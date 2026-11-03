@@ -1,6 +1,6 @@
 # Djinn slimming plan
 
-**Status:** 2026-11-02, S4 and S5 done (D18 to D24) except `cambium` 0.6.1, which waits on `genet-events`.
+**Status:** 2026-11-02, done: S0 to S5 (D1 to D24).
 Consumers outside Armillary and Dramatis still pin Djinn revisions from
 before the cut and move in S4. Findings were measured against Armillary `019d1e5` (Djinn's sources
 unchanged since `104b8d4`) and Mere `23bb596e2`.
@@ -538,7 +538,7 @@ dev-dependency.
 
 ### S5. Publish and resume
 
-Done 2026-11-02 except `cambium`. Published, each after a registry dry-run and a name
+Done 2026-11-02. Published, each after a registry dry-run and a name
 recheck (D7): `ostiary` 0.0.1, `peer-facts` 0.0.1, `personae` 0.3.1, `dramatis` 0.0.4
 (D23), `castellan-client` 0.0.1 (both feature sets verified against the registry),
 `armillary` 0.1.2 and `djinn` 0.0.3 (D24), then Mere's chain: `script-wire` 0.0.1 and
@@ -547,13 +547,13 @@ optional `wit` dependencies must be on the registry), `chirograph` 0.0.4 (the `w
 feature needs `CarrierError::Lapsed`; Knot's requirement moved first, `62aff7b`),
 `graphshell-endpoint` 0.0.3 (every feature verified; its `wit/world.wit` is a copy of
 the workspace's, held equal by `tests/wit_copy.rs`), `workbench` 0.1.1, `incipit` 0.2.1,
-`scenograph` 0.0.6, `scenomise` 0.0.7 and `mere-surface-api` 0.1.1.
+`scenograph` 0.0.6, `scenomise` 0.0.7, `mere-surface-api` 0.1.1, and `cambium` 0.6.1 after
+`genet-events` 0.0.1 (Genet `ad3627231`; its `publish = false` came off at Mark's instruction,
+and it is 0.0.1 because the event-dispatch API is unsettled).
 - Commits: Armillary `0b05362`, Dramatis `7308142`, Mere `5f618efaf`, `db4a8d447`,
   `6576edf7f`, `328709104`, Knot `62aff7b`.
-- Not published: `cambium` 0.6.1. Genet commit `43d13ce56` made it depend on
-  `genet-events`, which Genet keeps at 0.0.0 with `publish = false`; a crate with a
-  dependency off the registry cannot package. Publishing `genet-events` is a Genet-repo
-  change.
+- Mere `e14dd68cf` requires `genet-events` 0.0.1 and takes Genet's release commit in the
+  lock (the Genet family moves, 34 packages); the whole workspace checks under `--locked`.
 - Consumers lock Dramatis, Armillary and Mere by revision, so none moves until its next
   update; then `dramatis` rows reading 0.0.3 need 0.0.4 and Knot's `chirograph` row is
   already 0.0.4.
@@ -572,4 +572,4 @@ the workspace's, held equal by `tests/wit_copy.rs`), `workbench` 0.1.1, `incipit
   Djinn's listener tests, untouched by S3.
 - 2026-11-02: S4 surveyed; D18 to D21 answered, then D22 (the seal scope).
 - 2026-11-02: S4 done: Dramatis, Knot, Mere, Cleromancy and isocosm landed.
-- 2026-11-02: S5 done: sixteen crates published; D23 and D24 answered; cambium 0.6.1 waits on genet-events; F4 closed.
+- 2026-11-02: S5 done: eighteen crates published (genet-events and cambium 0.6.1 last); D23 and D24 answered; F4 closed.
