@@ -20,7 +20,8 @@ runner.
   move to their producers in the next plan, under the producer/host/runner
   survey (`mere:distillery-extraction` D10) and the store-lifetime fork
   (`mere:distillery-extraction` F1).
-- The custodian and `custody-wire` stay in Mere. Castellan stayed in Mere here
+- The custodian and `custody-wire` moved from Mere to Dramatis on 2026-11-03
+  (`dramatis/design_docs/2026-10-28_custody_plan.md`, D14). Castellan stayed in Mere here
   (the archived Dramatis plan's ruling D6, 2026-10-06) and moved to Dramatis on
   2026-11-03 (its current repo plan, D11 to D13), with the pandect wallet store as
   `sporran` and gazette's directory domain. This plan moves the application side
