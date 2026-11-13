@@ -11,12 +11,6 @@
 //! envelope without depending on each other. The common handshake is carried
 //! by `super::app_client` on native platforms; clients supply typed operations.
 
-#[cfg(all(
-    feature = "native",
-    any(unix, windows),
-    not(target_arch = "wasm32")
-))]
-use rand_core::{OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 use crate::app_admission::{AppAdmissionError, AppId};
@@ -42,17 +36,37 @@ impl BrowserChallenge {
         any(unix, windows),
         not(target_arch = "wasm32")
     ))]
-    pub fn fresh() -> Self {
+    pub fn fresh() -> Result<Self, NonceError> {
         let mut nonce = [0u8; 32];
-        OsRng.fill_bytes(&mut nonce);
-        Self {
+        fill_nonce(&mut nonce)?;
+        Ok(Self {
             schema: BROWSER_CHALLENGE_SCHEMA.to_string(),
             host_nonce: base64::Engine::encode(
                 &base64::engine::general_purpose::URL_SAFE_NO_PAD,
                 nonce,
             ),
-        }
+        })
     }
+}
+
+/// The operating system could not supply nonce bytes.
+#[cfg(all(
+    feature = "native",
+    any(unix, windows),
+    not(target_arch = "wasm32")
+))]
+#[derive(Debug, thiserror::Error)]
+#[error("the operating system could not supply nonce bytes: {0}")]
+pub struct NonceError(pub getrandom::Error);
+
+/// Fill `nonce` from the operating system's random source.
+#[cfg(all(
+    feature = "native",
+    any(unix, windows),
+    not(target_arch = "wasm32")
+))]
+pub fn fill_nonce(nonce: &mut [u8]) -> Result<(), NonceError> {
+    getrandom::fill(nonce).map_err(NonceError)
 }
 
 /// Application-to-host messages.
@@ -135,7 +149,7 @@ mod tests {
     ))]
     #[test]
     fn a_fresh_challenge_carries_a_32_byte_nonce_under_the_shared_schema() {
-        let challenge = BrowserChallenge::fresh();
+        let challenge = BrowserChallenge::fresh().expect("nonce");
         assert_eq!(challenge.schema, BROWSER_CHALLENGE_SCHEMA);
         let nonce = base64::Engine::decode(
             &base64::engine::general_purpose::URL_SAFE_NO_PAD,
@@ -143,7 +157,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(nonce.len(), 32);
-        assert_ne!(challenge, BrowserChallenge::fresh());
+        assert_ne!(challenge, BrowserChallenge::fresh().expect("nonce"));
     }
 
     #[test]

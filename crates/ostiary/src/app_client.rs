@@ -15,18 +15,18 @@
 //! application label is used by host route policy and is not executable
 //! authentication. Exchanges use `&mut self`, with one outstanding call.
 
-use rand_core::{OsRng, RngCore};
-
 use crate::app_admission::{AppHello, AppId, AppRouteId, configured_app_endpoint};
 use crate::declaration::AppDeclaration;
 use crate::frame::{
     FrameError, JsonDiagnostic, read_native_message_async, write_native_message_async,
 };
 use crate::local_endpoint::{LocalStream, connect_local};
-use crate::wire::{APP_CONNECT_SCHEMA, AppHostMessage, AppMessage};
+use crate::wire::{APP_CONNECT_SCHEMA, AppHostMessage, AppMessage, NonceError, fill_nonce};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppClientError {
+    #[error(transparent)]
+    Nonce(#[from] NonceError),
     #[error(transparent)]
     Frame(#[from] FrameError),
     #[error("the resident host closed the stream mid-conversation")]
@@ -150,7 +150,7 @@ impl AppConnection {
                 other => return Err(unexpected("a challenge", &other)),
             };
         let mut client_nonce = [0u8; 32];
-        OsRng.fill_bytes(&mut client_nonce);
+        fill_nonce(&mut client_nonce)?;
         write_native_message_async(
             &mut stream,
             &AppMessage::<(), ()>::Connect {
@@ -438,7 +438,7 @@ mod tests {
         let host = tokio::spawn(async move {
             use tokio::io::{AsyncReadExt, AsyncWriteExt};
             let hello: AppHello = read_native_message_async(&mut server).await.unwrap().unwrap();
-            let challenge = AppHostMessage::<(), (), ()>::Challenge { challenge: BrowserChallenge::fresh() };
+            let challenge = AppHostMessage::<(), (), ()>::Challenge { challenge: BrowserChallenge::fresh().expect("nonce") };
             write_native_message_async(&mut server, &challenge).await.unwrap();
             let connect: AppMessage<(), ()> = read_native_message_async(&mut server).await.unwrap().unwrap();
             assert!(matches!(connect, AppMessage::Connect { .. }));

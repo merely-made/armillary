@@ -56,7 +56,7 @@ pub fn launch_command(
     use std::os::unix::process::CommandExt;
 
     let mut bytes = [0u8; 32];
-    rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut bytes);
+    getrandom::fill(&mut bytes).map_err(std::io::Error::other)?;
     let handle = LaunchHandle::from_bytes(bytes);
 
     let mut fds = [0i32; 2];

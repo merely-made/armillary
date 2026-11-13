@@ -28,6 +28,7 @@ pub enum AppServerError {
     #[error(transparent)] Frame(#[from] FrameError),
     #[error(transparent)] Admission(#[from] AppAdmissionError),
     #[error(transparent)] Link(#[from] LinkError),
+    #[error(transparent)] Nonce(#[from] ostiary::wire::NonceError),
     #[error("the application stream ended before its hello")] MissingHello,
     #[error("the first application message must answer the host challenge")] ConnectRequired,
     #[error("application connect used another schema")] WrongSchema,
@@ -94,7 +95,7 @@ pub async fn refuse<W: AsyncWrite + Unpin>(writer: &mut W, error: &AppServerErro
 
 /// Complete connect after the adapter has captured its per-session surface.
 pub async fn connect<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(reader: &mut R, writer: &mut W, app: &AppId) -> Result<Option<LocalLink>, AppServerError> {
-    let challenge = BrowserChallenge::fresh();
+    let challenge = BrowserChallenge::fresh()?;
     write_native_message_async(writer, &AppHostMessage::<(), (), ()>::Challenge { challenge: challenge.clone() }).await?;
     let Some(message) = read_native_message_async::<_, AppMessage<serde::de::IgnoredAny, serde::de::IgnoredAny>>(reader).await? else { return Ok(None); };
     let AppMessage::Connect { schema, host_nonce, client_nonce } = message else { return Err(AppServerError::ConnectRequired); };
