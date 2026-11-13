@@ -1,0 +1,24 @@
+# cargo-deny configuration for armillary.
+#
+#   cargo deny check bans
+#
+# Two versions of one crate in a build are a defect: move the older version's
+# holder forward. No duplicates: latest releases, or a skip below saying who
+# holds the older one and what removes it (Mark, 2026-11-12). One entry per
+# older version; delete an entry when its holder moves, and
+# `cargo deny check bans` will name any that no longer match.
+
+[graph]
+all-features = true
+
+[bans]
+multiple-versions = "deny"
+wildcards = "allow"
+
+[[bans.skip]]
+crate = "syn@2.0.119"
+reason = "held by thiserror-impl 1.0.69 (djinn and ostiary name thiserror 1) and tracing-attributes 0.1.31 (its latest release); gone when tracing-attributes moves to syn 3.0.9"
+
+[[bans.skip]]
+crate = "windows-sys@0.59.0"
+reason = "held by djinn 0.0.3 and peer-facts 0.0.1, which name windows-sys 0.59; gone when they move to windows-sys 0.61.2"

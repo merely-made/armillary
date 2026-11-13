@@ -4,102 +4,146 @@
 schema = 1
 
 [decisions."djinn-slimming D1"]
-title = ". The library first, the resident next (Mark, 2026-10-31)"
+title = "The library first, the resident next (Mark, 2026-10-31)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+area = "Stack"
+summary = "Slim the Djinn library now; mere-resident's lanes move to their producers in the next plan."
+draws_on = ["mere:stack.3"]
 
 [decisions."djinn-slimming D2"]
-title = ". The custody client goes to Dramatis (Mark, 2026-10-31)"
+title = "The custody client goes to Dramatis (Mark, 2026-10-31)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+area = "Stack"
+summary = "The custody route's application side becomes a Dramatis crate over the door contract."
+draws_on = ["mere:stack.3"]
 
 [decisions."djinn-slimming D3"]
-title = ". A separate door contract crate (Mark, 2026-10-31)"
+title = "A separate door contract crate (Mark, 2026-10-31)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+area = "Stack"
+summary = "Producers depend on a small door contract crate in Armillary; Djinn keeps the serving half."
+draws_on = ["mere:stack.1", "mere:stack.3"]
 
 [decisions."djinn-slimming D4"]
-title = ". Cut after capability-door I1 (Mark, 2026-10-31)"
+title = "Cut after capability-door I1 (Mark, 2026-10-31)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
 summary = "Execution waits for capability-door I1 to land; the plan is written now."
 
 [decisions."djinn-slimming D5"]
-title = ". The door contract crate is `ostiary` (Mark, 2026-11-01)"
+title = "The door contract crate is `ostiary` (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "The door contract crate is named ostiary."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D6"]
-title = ". The custody crate is `castellan-client` (Mark, 2026-11-01)"
+title = "The custody crate is `castellan-client` (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "The custody client crate is named castellan-client, the petitioning side of Castellan."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D7"]
-title = ". Claim the names by publishing real code (Mark, 2026-11-01)"
+title = "Claim the names by publishing real code (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
 summary = "ostiary and castellan-client are claimed by S5's real publish, not by stubs."
 
 [decisions."djinn-slimming D8"]
-title = ". The socket fallback is inlined and pinned (Mark, 2026-11-01)"
+title = "The socket fallback is inlined and pinned (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "ostiary inlines the vault-directory socket fallback with a test pinning its path; no personae dependency."
 
 [decisions."djinn-slimming D9"]
-title = ". Ostiary reserves the byte path W1 needs (Mark, 2026-11-01)"
+title = "Ostiary reserves the byte path W1 needs (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "ostiary exposes the admitted stream after the hello so W1 can carry the WIT calls over the door; script-wire stays above it."
+draws_on = ["mere:capability-door D21"]
 
 [decisions."djinn-slimming D10"]
-title = ". Moved tests open over a stream (Mark, 2026-11-01)"
+title = "Moved tests open over a stream (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "ostiary's AppConnection::open_over runs the handshake over a given stream; the moved custody tests use it."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D11"]
-title = ". Ostiary keeps the module names, flat (Mark, 2026-11-01)"
+title = "Ostiary keeps the module names, flat (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "ostiary's modules keep Djinn's door module names at the crate root."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D12"]
-title = ". Djinn keeps its feature names (Mark, 2026-11-01)"
+title = "Djinn keeps its feature names (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "Djinn's door, door-native and door-serve features keep their names over ostiary."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D13"]
-title = ". Custody admission is a method on the call (Mark, 2026-11-01)"
+title = "Custody admission is a method on the call (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "authority.admit_custody(&call) becomes call.admitted_by(&authority)."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D14"]
-title = ". M1 lands first, and S4 carries its Mere side (Mark, 2026-11-01)"
+title = "M1 lands first, and S4 carries its Mere side (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "M1's Armillary commit lands before S3; S4's Mere repin carries M1's Mere branch in one change."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D15"]
-title = ". castellan-client's types are its default; `client` adds the clients (Mark, 2026-11-01)"
+title = "castellan-client's types are its default; `client` adds the clients (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "castellan-client defaults to the custody types; its client feature adds the clients."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D16"]
-title = ". castellan-client keeps the module names, flat (Mark, 2026-11-01)"
+title = "castellan-client keeps the module names, flat (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "castellan-client's modules keep Djinn's custody module names."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D17"]
-title = ". The custody fixtures move to Dramatis (Mark, 2026-11-01)"
+title = "The custody fixtures move to Dramatis (Mark, 2026-11-01)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "The custody fixtures and their check move to Dramatis with castellan-client."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D18"]
-title = ". Dramatis repins ostiary in step with the consumers (Mark, 2026-11-02)"
+title = "Dramatis repins ostiary in step with the consumers (Mark, 2026-11-02)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "castellan-client's ostiary pin moves with the consumers' Armillary revision; Mere also patches ostiary."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D19"]
-title = ". M1's Mere branch merges as it is, S4 on top (Mark, 2026-11-02)"
+title = "M1's Mere branch merges as it is, S4 on top (Mark, 2026-11-02)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "S4's Mere change merges m1/manifests with its commits, then repoints."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D20"]
-title = ". S4 carries M1's Cleromancy branch too (Mark, 2026-11-02)"
+title = "S4 carries M1's Cleromancy branch too (Mark, 2026-11-02)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "Cleromancy's repoint merges m1/declarations in the same landing."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D21"]
-title = ". Knot drops Djinn (Mark, 2026-11-02)"
+title = "Knot drops Djinn (Mark, 2026-11-02)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "knot-editor depends on ostiary and castellan-client, not Djinn."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D22"]
-title = ". The seal scope is declared, with the label table as fallback (Mark, 2026-11-02)"
+title = "The seal scope is declared, with the label table as fallback (Mark, 2026-11-02)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
 summary = "Retained content seals under the declared, granted scope, falling back to the label's; the M1 lane removes the fallback."
 draws_on = ["mere:capability-door D30"]
 amends = ["djinn-slimming D14"]
 
 [decisions."djinn-slimming D23"]
-title = ". Dramatis releases personae 0.3.1 and dramatis 0.0.4 first (Mark, 2026-11-02)"
+title = "Dramatis releases personae 0.3.1 and dramatis 0.0.4 first (Mark, 2026-11-02)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "personae 0.3.1 and dramatis 0.0.4 release the additive Dramatis changes castellan-client needs."
+plans = ["djinn-slimming"]
 
 [decisions."djinn-slimming D24"]
-title = ". Armillary 0.1.2, then Djinn (Mark, 2026-11-02)"
+title = "Armillary 0.1.2, then Djinn (Mark, 2026-11-02)"
 source = "design_docs/armillary_docs/implementation_strategy/2026-10-31_djinn_slimming_plan.md"
+summary = "armillary 0.1.2 releases the additive actor changes so Djinn 0.0.3 can publish."
+plans = ["djinn-slimming"]
