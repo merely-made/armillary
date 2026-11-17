@@ -1,0 +1,20 @@
+# cargo-deny configuration for armillary.
+#
+#   cargo deny check bans
+#
+# Two versions of one crate in a build are a defect: move the older version's
+# holder forward. No duplicates: latest releases, or a skip below saying who
+# holds the older one and what removes it (Mark, 2026-11-12). One entry per
+# older version; delete an entry when its holder moves, and
+# `cargo deny check bans` will name any that no longer match.
+
+[graph]
+all-features = true
+
+[bans]
+multiple-versions = "deny"
+wildcards = "allow"
+
+[[bans.skip]]
+crate = "syn@2.0.119"
+reason = "held by tracing-attributes 0.1.31 (its latest release); gone when it moves to syn 3"

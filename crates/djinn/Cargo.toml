@@ -11,25 +11,25 @@ description = "Application door server and resident lifetime."
 default = []
 door = ["dep:ostiary"]
 door-native = ["door", "ostiary/native"]
-door-serve = ["door-native", "dep:armillary", "armillary/tokio", "dep:serde", "dep:thiserror", "dep:tokio", "dep:base64", "dep:rand_core", "dep:tracing", "dep:libc", "dep:windows-sys", "dep:blake3", "dep:peer-facts"]
+door-serve = ["door-native", "dep:armillary", "armillary/tokio", "dep:serde", "dep:thiserror", "dep:tokio", "dep:base64", "dep:getrandom", "dep:tracing", "dep:libc", "dep:windows-sys", "dep:blake3", "dep:peer-facts"]
 resident = ["dep:armillary", "armillary/tokio", "dep:tokio"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"], optional = true }
-thiserror = { version = "1", optional = true }
+thiserror = { version = "2", optional = true }
 armillary = { version = "0.1.2", path = "../armillary", optional = true }
 ostiary = { version = "0.0.1", path = "../ostiary", optional = true }
-peer-facts = { version = "0.0.2", path = "../peer-facts", optional = true }
+peer-facts = { version = "0.0.3", path = "../peer-facts", optional = true }
 
 [target.'cfg(all(not(target_arch = "wasm32"), any(unix, windows)))'.dependencies]
 tokio = { version = "1", features = ["io-util", "rt", "rt-multi-thread", "net", "time", "sync", "macros"], optional = true }
-base64 = { version = "0.22", optional = true }
+base64 = { version = "0.23", optional = true }
 blake3 = { version = "1", optional = true }
-rand_core = { version = "0.6", features = ["getrandom"], optional = true }
+getrandom = { version = "0.4", optional = true }
 tracing = { version = "0.1", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Pipes", "Win32_System_Threading"], optional = true }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Pipes", "Win32_System_Threading"], optional = true }
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2", optional = true }
 

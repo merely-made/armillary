@@ -1,6 +1,6 @@
 [package]
 name = "peer-facts"
-version = "0.0.2"
+version = "0.0.3"
 rust-version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -14,7 +14,7 @@ serde = { version = "1", features = ["derive"] }
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = [
+windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_Security_Authorization",

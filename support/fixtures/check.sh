@@ -9,8 +9,8 @@ for fixture in ostiary/portable ostiary/native djinn/resident; do
   echo "Fixture: $fixture"
   crate="${fixture%%/*}"
   name="${fixture//\//-}"
-  cargo test --offline --locked --manifest-path "$fixture/Cargo.toml" --lib
-  cargo metadata --offline --locked --format-version 1 --filter-platform x86_64-unknown-linux-gnu --manifest-path "$fixture/Cargo.toml" > "$metadata_dir/$name.json"
+  cargo test --offline --manifest-path "$fixture/Cargo.toml" --lib
+  cargo metadata --offline --format-version 1 --filter-platform x86_64-unknown-linux-gnu --manifest-path "$fixture/Cargo.toml" > "$metadata_dir/$name.json"
   python3 - "$metadata_dir/$name.json" "$metadata_dir/$name-cone.json" "$crate" <<'PYCODE'
 import json,sys
 m=json.load(open(sys.argv[1])); packages={p['id']:p for p in m['packages']}; nodes={n['id']:n for n in m['resolve']['nodes']}; seen=set(); pending=[m['resolve']['root']]
@@ -42,9 +42,9 @@ PYCODE
       djinn/resident) symbol=door ;;
       *) echo "Unknown forbidden fixture: $fixture"; exit 1 ;;
     esac
-    if cargo check --offline --locked --manifest-path "$fixture/Cargo.toml" --example forbidden > "$logfile" 2>&1; then cat "$logfile"; exit 1; fi
+    if cargo check --offline --manifest-path "$fixture/Cargo.toml" --example forbidden > "$logfile" 2>&1; then cat "$logfile"; exit 1; fi
     if ! grep -q 'error\[E0432\]' "$logfile" || ! grep -Fq "no \`$symbol\` in" "$logfile"; then cat "$logfile"; exit 1; fi
     echo "forbidden import: expected E0432 for $symbol"
   fi
 done
-cargo check --offline --locked --manifest-path ostiary/portable/Cargo.toml --target wasm32-unknown-unknown
+cargo check --offline --manifest-path ostiary/portable/Cargo.toml --target wasm32-unknown-unknown
