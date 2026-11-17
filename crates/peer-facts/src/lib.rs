@@ -36,8 +36,14 @@ pub enum Peer {
         #[serde(default)]
         image: Option<String>,
     },
-    /// A macOS XPC peer whose code signature the native host verified.
-    Signed { team: String, identifier: String },
+    /// A macOS peer whose code signature the native host verified.
+    Signed {
+        team: String,
+        identifier: String,
+        /// The verified leaf certificate, where the native host observed it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        certificate_sha1: Option<String>,
+    },
 }
 
 impl Peer {
@@ -46,17 +52,23 @@ impl Peer {
         match self {
             Self::Unix { uid, .. } => format!("uid:{uid}"),
             Self::Windows { sid, .. } => format!("sid:{sid}"),
-            Self::Signed { team, identifier } => format!("signed:{team}:{identifier}"),
+            Self::Signed {
+                team, identifier, ..
+            } => format!("signed:{team}:{identifier}"),
         }
     }
 }
 
-/// A team and code identifier a macOS peer's signature must satisfy.
+/// The signing requirement a macOS peer must satisfy.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SignedIdentity {
     pub team: String,
     pub identifier: String,
+    /// Optionally require this exact leaf certificate, using Apple's
+    /// certificate-hash requirement syntax. A team may own other keys.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub certificate_sha1: Option<String>,
 }
 
 /// One Windows process: its id and creation time. An id is reused once its
@@ -201,13 +213,13 @@ impl Connected {
 #[cfg(target_os = "macos")]
 pub fn signed_peer(fd: std::os::fd::RawFd, candidates: &[SignedIdentity]) -> Option<Peer> {
     let token = macos::audit_token(fd)?;
-    candidates
-        .iter()
-        .find(|c| macos::satisfies(&token, &c.team, &c.identifier))
-        .map(|c| Peer::Signed {
+    candidates.iter().find_map(|c| {
+        macos::signer(&token, c).map(|certificate| Peer::Signed {
             team: c.team.clone(),
             identifier: c.identifier.clone(),
+            certificate_sha1: Some(certificate),
         })
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -242,6 +254,7 @@ mod tests {
         let signed = Peer::Signed {
             team: "T".into(),
             identifier: "i".into(),
+            certificate_sha1: None,
         };
         assert_eq!(signed.account(), "signed:T:i");
         let json = serde_json::to_value(&unix).unwrap();
@@ -250,6 +263,28 @@ mod tests {
             serde_json::json!({"kind": "unix", "uid": 501, "gid": 20, "pid": 7})
         );
         assert_eq!(serde_json::from_value::<Peer>(json).unwrap(), unix);
+    }
+
+    #[test]
+    fn certificate_facts_and_requirements_preserve_legacy_wire_values() {
+        let legacy = serde_json::json!({"kind": "signed", "team": "T", "identifier": "i"});
+        let peer: Peer = serde_json::from_value(legacy.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&peer).unwrap(), legacy);
+        let fingerprint = "a".repeat(40);
+        let signed =
+            serde_json::json!({"team": "T", "identifier": "i", "certificate_sha1": fingerprint});
+        let requirement: SignedIdentity = serde_json::from_value(signed.clone()).unwrap();
+        assert_eq!(serde_json::to_value(requirement).unwrap(), signed);
+        let peer = Peer::Signed {
+            team: "T".into(),
+            identifier: "i".into(),
+            certificate_sha1: Some(fingerprint),
+        };
+        assert_eq!(
+            serde_json::from_value::<Peer>(serde_json::to_value(&peer).unwrap()).unwrap(),
+            peer
+        );
+        assert_eq!(peer.account(), "signed:T:i");
     }
 
     #[cfg(unix)]
@@ -284,11 +319,13 @@ mod tests {
         let candidates = [SignedIdentity {
             team: "ABCDE12345".into(),
             identifier: "com.merely.djinn.custodian".into(),
+            certificate_sha1: None,
         }];
         assert!(signed_peer(a.as_raw_fd(), &candidates).is_none());
         let injected = [SignedIdentity {
             team: "X\" or anchor apple".into(),
             identifier: "y".into(),
+            certificate_sha1: None,
         }];
         assert!(
             signed_peer(a.as_raw_fd(), &injected).is_none(),
